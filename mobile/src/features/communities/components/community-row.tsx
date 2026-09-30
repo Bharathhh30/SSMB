@@ -16,7 +16,7 @@ export function CommunityRow({ community }: CommunityRowProps) {
   return (
     <View
       accessible
-      accessibilityLabel={`${community.name}, ${community.topic}, ${community.members}, ${community.access}`}
+      accessibilityLabel={`${community.name}, ${community.topic}, ${community.access}`}
       style={styles.row}
     >
       <View style={[styles.avatar, { backgroundColor: tone.background }]}>
@@ -28,13 +28,20 @@ export function CommunityRow({ community }: CommunityRowProps) {
           {community.name}
         </Text>
         <Text numberOfLines={1} style={styles.meta}>
-          {community.topic} <Text style={styles.separator}>·</Text> {community.members}
+          {community.topic} <Text style={styles.separator}>·</Text>{' '}
+          {community.members ?? community.description}
         </Text>
       </View>
 
       <View style={styles.activity}>
-        <View style={styles.activityDot} />
-        <Text style={styles.activityText}>{community.activeNow}</Text>
+        {community.activeNow !== undefined ? (
+          <>
+            <View style={styles.activityDot} />
+            <Text style={styles.activityText}>{community.activeNow}</Text>
+          </>
+        ) : (
+          <Text style={styles.accessText}>{community.access}</Text>
+        )}
       </View>
     </View>
   );
@@ -98,6 +105,12 @@ function makeStyles(colors: ReturnType<typeof useAppTheme>) {
       color: colors.inkMuted,
       fontSize: typeScale.caption,
       fontVariant: ['tabular-nums'],
+    },
+    accessText: {
+      color: colors.inkMuted,
+      fontSize: typeScale.caption,
+      fontWeight: '600',
+      textAlign: 'right',
     },
   });
 }

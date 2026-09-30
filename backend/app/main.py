@@ -2,6 +2,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app import __version__
 from app.api.v1.router import api_router
@@ -19,12 +20,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         database_engine = create_database_engine(configuration.database_url)
         application.state.database_engine = database_engine
+        application.state.database_session_factory = (
+            async_sessionmaker(database_engine, expire_on_commit=False)
+            if database_engine is not None
+            else None
+        )
         try:
             yield
         finally:
             if database_engine is not None:
                 await database_engine.dispose()
             application.state.database_engine = None
+            application.state.database_session_factory = None
 
     application = FastAPI(
         title=configuration.app_name,
@@ -35,6 +42,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     application.state.database_engine = None
+    application.state.database_session_factory = None
     application.include_router(api_router, prefix=API_V1_PREFIX)
     return application
 

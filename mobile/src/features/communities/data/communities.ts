@@ -1,13 +1,15 @@
+import type { ApiCommunity } from '@/features/communities/api/communities-api';
+
 export type CommunityTopic = 'Exam prep' | 'Technology' | 'Languages' | 'Creative';
 export type CommunityTone = 'sage' | 'apricot' | 'lilac' | 'sky' | 'rose';
 
 export type Community = {
   id: string;
   name: string;
-  topic: CommunityTopic;
+  topic: string;
   description: string;
-  members: string;
-  activeNow: number;
+  members?: string;
+  activeNow?: number;
   access: 'Open' | 'Invite only';
   tone: CommunityTone;
   monogram: string;
@@ -89,3 +91,30 @@ export const joinedCommunityIds = ['gate-quant-lab', 'react-native-makers'];
 export const joinedCommunities = communities.filter((community) =>
   joinedCommunityIds.includes(community.id),
 );
+
+const communityTones: CommunityTone[] = ['sage', 'apricot', 'lilac', 'sky', 'rose'];
+
+export function toCommunityCard(community: ApiCommunity): Community {
+  const toneIndex = [...community.id].reduce(
+    (total, character) => total + character.charCodeAt(0),
+    0,
+  );
+  const monogram = community.name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join('')
+    .toLocaleUpperCase();
+
+  return {
+    id: community.id,
+    name: community.name,
+    topic: community.topic,
+    description: community.description,
+    access: community.access_type === 'open' ? 'Open' : 'Invite only',
+    tone: communityTones[toneIndex % communityTones.length],
+    monogram,
+    tags: [],
+  };
+}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   ScrollView,
   StyleSheet,
@@ -13,10 +14,11 @@ import { AppSymbol } from '@/components/app-symbol';
 import { MotionPressable } from '@/components/motion-pressable';
 import { CommunityRow } from '@/features/communities/components/community-row';
 import {
-  communities,
   communityTopics,
+  toCommunityCard,
   type CommunityTopic,
 } from '@/features/communities/data/communities';
+import { useDiscoverCommunities } from '@/features/communities/hooks/use-discover-communities';
 import { layout, radius, spacing, typeScale, useAppTheme } from '@/theme';
 
 const allTopics = ['All', ...communityTopics] as const;
@@ -34,30 +36,20 @@ export default function DiscoverScreen() {
   const [selectedTopic, setSelectedTopic] = useState<TopicFilter>(
     isCommunityTopic(initialTopic) ? initialTopic : 'All',
   );
+  const communityQuery = useDiscoverCommunities(
+    query,
+    selectedTopic === 'All' ? undefined : selectedTopic,
+  );
+  const displayedCommunities = useMemo(
+    () => communityQuery.items.map(toCommunityCard),
+    [communityQuery.items],
+  );
 
   useEffect(() => {
     if (isCommunityTopic(initialTopic)) {
       setSelectedTopic(initialTopic);
     }
   }, [initialTopic]);
-
-  const filteredCommunities = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase();
-
-    return communities.filter((community) => {
-      const matchesTopic = selectedTopic === 'All' || community.topic === selectedTopic;
-      const searchableText = [
-        community.name,
-        community.topic,
-        community.description,
-        ...community.tags,
-      ]
-        .join(' ')
-        .toLocaleLowerCase();
-
-      return matchesTopic && (!normalizedQuery || searchableText.includes(normalizedQuery));
-    });
-  }, [query, selectedTopic]);
 
   const clearFilters = () => {
     setQuery('');
@@ -135,8 +127,13 @@ export default function DiscoverScreen() {
               {selectedTopic === 'All' ? 'A few good places to begin' : selectedTopic}
             </Text>
             <Text style={styles.resultsSubtitle}>
-              {filteredCommunities.length}{' '}
-              {filteredCommunities.length === 1 ? 'circle' : 'circles'} to explore
+              {communityQuery.status === 'loading'
+                ? 'Finding circles…'
+                : communityQuery.status === 'error'
+                  ? 'Could not reach the community service'
+                  : `${communityQuery.total} ${
+                      communityQuery.total === 1 ? 'circle' : 'circles'
+                    } to explore`}
             </Text>
           </View>
           <View style={styles.resultsIcon}>
@@ -145,31 +142,88 @@ export default function DiscoverScreen() {
         </View>
       </View>
     ),
-    [colors, filteredCommunities.length, query, selectedTopic, styles],
+    [colors, communityQuery.status, communityQuery.total, query, selectedTopic, styles],
   );
 
-  const emptyState = (
-    <View style={styles.emptyState}>
-      <View style={styles.emptyIcon}>
-        <AppSymbol color={colors.accent} name="search" size={22} />
+  const hasFilters = query.trim().length > 0 || selectedTopic !== 'All';
+  const emptyState =
+    communityQuery.status === 'loading' ? (
+      <View style={styles.statePanel}>
+        <ActivityIndicator color={colors.accent} />
+        <Text style={styles.stateMessage}>Finding good circles for you…</Text>
       </View>
-      <Text style={styles.emptyTitle}>No circles found</Text>
-      <Text style={styles.emptyCopy}>Try a different phrase or clear your filters.</Text>
-      <MotionPressable onPress={clearFilters} style={styles.clearFilters}>
-        <Text style={styles.clearFiltersText}>Clear filters</Text>
-      </MotionPressable>
-    </View>
-  );
+    ) : communityQuery.status === 'error' ? (
+      <View style={styles.statePanel}>
+        <Text style={styles.emptyTitle}>Can’t load communities</Text>
+        <Text style={styles.stateMessage}>{communityQuery.error?.message}</Text>
+        <MotionPressable
+          accessibilityLabel="Retry loading communities"
+          onPress={communityQuery.retry}
+          style={styles.retryButton}
+        >
+          <Text style={styles.retryText}>Try again</Text>
+        </MotionPressable>
+      </View>
+    ) : displayedCommunities.length === 0 ? (
+      <View style={styles.emptyState}>
+        <View style={styles.emptyIcon}>
+          <AppSymbol color={colors.accent} name="search" size={22} />
+        </View>
+        <Text style={styles.emptyTitle}>{hasFilters ? 'No circles found' : 'No circles yet'}</Text>
+        <Text style={styles.emptyCopy}>
+          {hasFilters
+            ? 'Try another phrase or clear your filters.'
+            : 'New communities will show up here when they’re ready.'}
+        </Text>
+        {hasFilters ? (
+          <MotionPressable onPress={clearFilters} style={styles.clearFilters}>
+            <Text style={styles.clearFiltersText}>Clear filters</Text>
+          </MotionPressable>
+        ) : null}
+      </View>
+    ) : null;
+
+  const listFooter =
+    communityQuery.hasNextPage || communityQuery.isLoadingMore ? (
+      <View style={styles.loadMoreContainer}>
+        {communityQuery.isLoadingMore ? (
+          <View style={styles.loadingMoreRow}>
+            <ActivityIndicator color={colors.accent} size="small" />
+            <Text style={styles.stateMessage}>Loading more circles…</Text>
+          </View>
+        ) : communityQuery.loadingMoreError ? (
+          <>
+            <Text style={styles.stateMessage}>{communityQuery.loadingMoreError.message}</Text>
+            <MotionPressable
+              accessibilityLabel="Retry loading more communities"
+              onPress={communityQuery.retryLoadingMore}
+              style={styles.loadMoreButton}
+            >
+              <Text style={styles.retryText}>Retry</Text>
+            </MotionPressable>
+          </>
+        ) : (
+          <MotionPressable
+            accessibilityLabel="Load more communities"
+            onPress={() => void communityQuery.loadMore()}
+            style={styles.loadMoreButton}
+          >
+            <Text style={styles.retryText}>Load more circles</Text>
+          </MotionPressable>
+        )}
+      </View>
+    ) : null;
 
   return (
     <View style={styles.screen}>
       <FlatList
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={emptyState}
+        ListFooterComponent={listFooter}
         ListHeaderComponent={listHeader}
         contentContainerStyle={styles.content}
         contentInsetAdjustmentBehavior="automatic"
-        data={filteredCommunities}
+        data={displayedCommunities}
         keyboardShouldPersistTaps="handled"
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <CommunityRow community={item} />}
@@ -319,6 +373,54 @@ function makeStyles(colors: ReturnType<typeof useAppTheme>) {
       paddingHorizontal: spacing.xl,
       paddingVertical: spacing.xxxl,
       gap: spacing.sm,
+    },
+    statePanel: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.xxxl,
+      gap: spacing.md,
+    },
+    stateMessage: {
+      color: colors.inkMuted,
+      fontSize: typeScale.footnote,
+      lineHeight: 20,
+      textAlign: 'center',
+    },
+    retryButton: {
+      minHeight: 44,
+      justifyContent: 'center',
+      paddingHorizontal: spacing.lg,
+      backgroundColor: colors.accentSoft,
+      borderRadius: radius.full,
+      borderCurve: 'continuous',
+    },
+    retryText: {
+      color: colors.accentInk,
+      fontSize: typeScale.footnote,
+      fontWeight: '700',
+    },
+    loadMoreContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.xl,
+    },
+    loadingMoreRow: {
+      minHeight: 44,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    loadMoreButton: {
+      minHeight: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing.lg,
+      backgroundColor: colors.accentSoft,
+      borderRadius: radius.full,
+      borderCurve: 'continuous',
     },
     emptyIcon: {
       width: 56,

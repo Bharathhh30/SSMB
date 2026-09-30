@@ -1,0 +1,45 @@
+from datetime import UTC, datetime
+
+from sqlalchemy import func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.features.communities.models import Community
+
+
+async def list_communities(
+    session: AsyncSession,
+    *,
+    query: str | None,
+    topic: str | None,
+    limit: int,
+    offset: int,
+) -> tuple[list[Community], int]:
+    now = datetime.now(UTC)
+    filters = [
+        Community.access_type == "open",
+        or_(Community.expires_at.is_(None), Community.expires_at > now),
+    ]
+
+    if query:
+        escaped_query = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped_query}%"
+        filters.append(
+            or_(
+                Community.name.ilike(pattern, escape="\\"),
+                Community.topic.ilike(pattern, escape="\\"),
+                Community.description.ilike(pattern, escape="\\"),
+            )
+        )
+    if topic:
+        filters.append(Community.topic == topic)
+
+    total = await session.scalar(select(func.count()).select_from(Community).where(*filters))
+    statement = (
+        select(Community)
+        .where(*filters)
+        .order_by(Community.name.asc(), Community.id.asc())
+        .limit(limit)
+        .offset(offset)
+    )
+    communities = await session.scalars(statement)
+    return list(communities.all()), total or 0
