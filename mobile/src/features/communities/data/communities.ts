@@ -9,12 +9,9 @@ export type Community = {
   name: string;
   topic: string;
   description: string;
-  members?: string;
-  activeNow?: number;
   access: 'Open' | 'Invite only';
   tone: CommunityTone;
   monogram: string;
-  tags: string[];
 };
 
 export const communityTopics: CommunityTopic[] = [
@@ -23,75 +20,6 @@ export const communityTopics: CommunityTopic[] = [
   'Languages',
   'Creative',
 ];
-
-export const communities: Community[] = [
-  {
-    id: 'gate-quant-lab',
-    name: 'GATE Quant Lab',
-    topic: 'Exam prep',
-    description: 'Focused problem-solving, one small win at a time.',
-    members: '2.4k members',
-    activeNow: 38,
-    access: 'Open',
-    tone: 'sage',
-    monogram: 'GQ',
-    tags: ['GATE', 'Quantitative aptitude', 'Study group'],
-  },
-  {
-    id: 'jee-study-hall',
-    name: 'JEE Study Hall',
-    topic: 'Exam prep',
-    description: 'A calm, consistent space for JEE preparation.',
-    members: '1.8k members',
-    activeNow: 24,
-    access: 'Open',
-    tone: 'apricot',
-    monogram: 'J',
-    tags: ['JEE', 'Physics', 'Chemistry', 'Maths'],
-  },
-  {
-    id: 'react-native-makers',
-    name: 'React Native Makers',
-    topic: 'Technology',
-    description: 'Build, share, and learn from each other.',
-    members: '960 members',
-    activeNow: 17,
-    access: 'Open',
-    tone: 'sky',
-    monogram: 'RN',
-    tags: ['React Native', 'Expo', 'Mobile development'],
-  },
-  {
-    id: 'design-product-notes',
-    name: 'Design + Product Notes',
-    topic: 'Creative',
-    description: 'Thoughtful critique for people who make things.',
-    members: '740 members',
-    activeNow: 9,
-    access: 'Invite only',
-    tone: 'lilac',
-    monogram: 'D+',
-    tags: ['Product design', 'Portfolio', 'Feedback'],
-  },
-  {
-    id: 'language-exchange',
-    name: 'Language Exchange',
-    topic: 'Languages',
-    description: 'Practice a new language with friendly people.',
-    members: '1.2k members',
-    activeNow: 21,
-    access: 'Open',
-    tone: 'rose',
-    monogram: 'L',
-    tags: ['Languages', 'Conversation', 'Practice'],
-  },
-];
-
-export const featuredCommunity = communities[0];
-export const joinedCommunityIds = ['gate-quant-lab', 'react-native-makers'];
-export const joinedCommunities = communities.filter((community) =>
-  joinedCommunityIds.includes(community.id),
-);
 
 const communityTones: CommunityTone[] = ['sage', 'apricot', 'lilac', 'sky', 'rose'];
 
@@ -117,6 +45,5 @@ export function toCommunityCard(community: ApiCommunity): Community {
     access: community.access_type === 'open' ? 'Open' : 'Invite only',
     tone: communityTones[toneIndex % communityTones.length],
     monogram,
-    tags: [],
   };
 }

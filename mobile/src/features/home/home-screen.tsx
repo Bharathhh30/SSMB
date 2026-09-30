@@ -4,8 +4,10 @@ import { useRouter } from 'expo-router';
 
 import { AppSymbol } from '@/components/app-symbol';
 import { MotionPressable } from '@/components/motion-pressable';
-import { CommunityRow } from '@/features/communities/components/community-row';
-import { featuredCommunity, joinedCommunities } from '@/features/communities/data/communities';
+import {
+  communityTopics,
+  type CommunityTopic,
+} from '@/features/communities/data/communities';
 import { layout, radius, spacing, typeScale, useAppTheme } from '@/theme';
 
 const LONG_DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
@@ -20,26 +22,51 @@ const greetingForHour = (hour: number) => {
   return 'Good evening';
 };
 
+const topicDescriptions: Record<CommunityTopic, string> = {
+  'Exam prep': 'Study toward a test, certification, or personal milestone.',
+  Technology: 'Explore tools, code, and technical ideas together.',
+  Languages: 'Practice a language through shared goals and conversation.',
+  Creative: 'Make room for ideas, craft, and thoughtful feedback.',
+};
+
 export default function HomeScreen() {
   const colors = useAppTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
 
   const openDiscover = useCallback(
-    (topic?: string) => {
+    (topic?: CommunityTopic) => {
       router.push(topic ? { pathname: '/discover', params: { topic } } : '/discover');
     },
     [router],
   );
 
-  const renderCommunity = useCallback(
-    ({ item }: { item: (typeof joinedCommunities)[number] }) => (
-      <CommunityRow community={item} />
+  const renderTopic = useCallback(
+    ({ item }: { item: CommunityTopic }) => (
+      <MotionPressable
+        accessibilityLabel={`Explore ${item} communities`}
+        onPress={() => openDiscover(item)}
+        style={styles.topicCard}
+      >
+        <View style={styles.topicCardTopline}>
+          <View style={styles.topicMark}>
+            <AppSymbol color={colors.accent} name="sparkle" size={16} />
+          </View>
+          <AppSymbol color={colors.inkSubtle} name="arrowRight" size={16} />
+        </View>
+        <Text style={styles.topicTitle}>{item}</Text>
+        <Text numberOfLines={2} style={styles.topicDescription}>
+          {topicDescriptions[item]}
+        </Text>
+      </MotionPressable>
     ),
-    [],
+    [colors.accent, colors.inkSubtle, openDiscover, styles],
   );
 
-  const separator = useCallback(() => <View style={styles.separator} />, [styles.separator]);
+  const topicRowSeparator = useCallback(
+    () => <View style={styles.topicRowSeparator} />,
+    [styles.topicRowSeparator],
+  );
 
   const listHeader = useMemo(
     () => (
@@ -47,7 +74,7 @@ export default function HomeScreen() {
         <View style={styles.intro}>
           <View style={styles.eyebrowRow}>
             <View style={styles.eyebrowDot} />
-            <Text style={styles.eyebrow}>A BETTER WAY TO LEARN</Text>
+            <Text style={styles.eyebrow}>LEARN, MAKE, GROW TOGETHER</Text>
           </View>
           <Text style={styles.date}>{LONG_DATE_FORMATTER.format(new Date())}</Text>
           <Text accessibilityRole="header" style={styles.headline}>
@@ -68,31 +95,28 @@ export default function HomeScreen() {
           <AppSymbol color={colors.inkSubtle} name="arrowRight" size={17} />
         </MotionPressable>
 
-        <View
-          accessibilityLabel={`Featured community: ${featuredCommunity.name}`}
-          style={styles.feature}
-        >
+        <View style={styles.feature}>
           <View accessible={false} style={styles.artRingOuter} />
           <View accessible={false} style={styles.artRingInner} />
           <View style={styles.featureTopline}>
             <View style={styles.featureLabel}>
               <AppSymbol color={colors.highlight} name="sparkle" size={14} />
-              <Text style={styles.featureEyebrow}>CIRCLE OF THE WEEK</Text>
+              <Text style={styles.featureEyebrow}>A GOOD PLACE TO BEGIN</Text>
             </View>
-            <Text style={styles.featureCount}>0{joinedCommunities.length + 1}</Text>
           </View>
 
           <Text style={styles.featureTitle}>Big goals feel{'\n'}lighter together.</Text>
           <Text style={styles.featureCopy}>
-            Meet {featuredCommunity.name} — a focused space to keep your momentum.
+            Find an open community around something you're learning, making, or simply curious
+            about.
           </Text>
 
           <MotionPressable
-            accessibilityLabel={`Explore ${featuredCommunity.topic} communities`}
-            onPress={() => openDiscover(featuredCommunity.topic)}
+            accessibilityLabel="Explore open communities"
+            onPress={() => openDiscover()}
             style={styles.featureAction}
           >
-            <Text style={styles.featureActionText}>Find your circle</Text>
+            <Text style={styles.featureActionText}>Explore communities</Text>
             <AppSymbol color={colors.highlightInk} name="arrowRight" size={17} />
           </MotionPressable>
         </View>
@@ -100,18 +124,12 @@ export default function HomeScreen() {
         <View style={styles.sectionHeading}>
           <View>
             <Text accessibilityRole="header" style={styles.sectionTitle}>
-              Your circles
+              Explore by interest
             </Text>
-            <Text style={styles.sectionSubtitle}>Good things grow together.</Text>
+            <Text style={styles.sectionSubtitle}>
+              Pick a starting point and see what's out there.
+            </Text>
           </View>
-          <MotionPressable
-            accessibilityLabel="Browse all communities"
-            onPress={() => openDiscover()}
-            style={styles.seeAll}
-          >
-            <Text style={styles.seeAllText}>See all</Text>
-            <AppSymbol color={colors.accent} name="arrowRight" size={15} />
-          </MotionPressable>
         </View>
       </View>
     ),
@@ -140,14 +158,16 @@ export default function HomeScreen() {
   return (
     <View style={styles.screen}>
       <FlatList
-        ItemSeparatorComponent={separator}
+        ItemSeparatorComponent={topicRowSeparator}
         ListFooterComponent={listFooter}
         ListHeaderComponent={listHeader}
+        columnWrapperStyle={styles.topicRow}
         contentContainerStyle={styles.content}
         contentInsetAdjustmentBehavior="automatic"
-        data={joinedCommunities}
-        keyExtractor={(item) => item.id}
-        renderItem={renderCommunity}
+        data={communityTopics}
+        keyExtractor={(topic) => topic}
+        numColumns={2}
+        renderItem={renderTopic}
         showsVerticalScrollIndicator={false}
       />
     </View>
@@ -282,12 +302,6 @@ function makeStyles(colors: ReturnType<typeof useAppTheme>) {
       fontWeight: '700',
       letterSpacing: 1,
     },
-    featureCount: {
-      color: colors.heroMuted,
-      fontSize: typeScale.caption,
-      fontVariant: ['tabular-nums'],
-      fontWeight: '600',
-    },
     featureTitle: {
       color: colors.heroInk,
       fontSize: typeScale.title + 4,
@@ -318,6 +332,48 @@ function makeStyles(colors: ReturnType<typeof useAppTheme>) {
       fontSize: typeScale.footnote,
       fontWeight: '700',
     },
+    topicRow: {
+      gap: spacing.sm,
+    },
+    topicRowSeparator: {
+      height: spacing.sm,
+    },
+    topicCard: {
+      flex: 1,
+      minWidth: 0,
+      minHeight: 142,
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+      padding: spacing.md,
+      backgroundColor: colors.surface,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.hairline,
+      borderRadius: radius.lg,
+      borderCurve: 'continuous',
+    },
+    topicCardTopline: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    topicMark: {
+      width: 34,
+      height: 34,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.accentSoft,
+      borderRadius: radius.full,
+    },
+    topicTitle: {
+      color: colors.ink,
+      fontSize: typeScale.body,
+      fontWeight: '700',
+    },
+    topicDescription: {
+      color: colors.inkMuted,
+      fontSize: typeScale.caption,
+      lineHeight: 18,
+    },
     sectionHeading: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -337,23 +393,6 @@ function makeStyles(colors: ReturnType<typeof useAppTheme>) {
       color: colors.inkMuted,
       fontSize: typeScale.footnote,
       marginTop: spacing.xxs,
-    },
-    seeAll: {
-      minHeight: 44,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
-      paddingHorizontal: spacing.xs,
-    },
-    seeAllText: {
-      color: colors.accent,
-      fontSize: typeScale.footnote,
-      fontWeight: '600',
-    },
-    separator: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: colors.hairline,
-      marginLeft: 50 + spacing.md,
     },
     footer: {
       alignItems: 'center',

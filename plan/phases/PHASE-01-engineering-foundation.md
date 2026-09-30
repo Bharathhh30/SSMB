@@ -24,7 +24,8 @@
 - [x] Expo Router tabs scaffold created with TypeScript and the current SDK-compatible Reanimated/worklets dependencies.
 - [x] Dependencies locked; transitive overrides applied for the scaffold audit advisories.
 - [x] TypeScript, Expo dependency alignment, Expo Doctor, dependency audit, and web static export pass.
-- [x] Replace template demo screens with themed Home and API-backed Discover flows.
+- [x] Replace template screens with a themed, guest-safe Home and API-backed Discover flow.
+- [x] Remove fixture membership claims and provide topic shortcuts until identity/membership exists.
 - [x] Add the FastAPI health/discovery API, PostgreSQL configuration, initial users/communities schema, Alembic revision, and explicit development seed.
 - [x] Add typed mobile API URL configuration, request/error handling, and a GitHub Actions PR workflow with a PostgreSQL service.
 - [x] Add mobile API contract unit tests and wire them into pull-request CI.

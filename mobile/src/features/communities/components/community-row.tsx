@@ -25,20 +25,12 @@ export function CommunityRow({ community, onPress }: CommunityRowProps) {
           {community.name}
         </Text>
         <Text numberOfLines={1} style={styles.meta}>
-          {community.topic} <Text style={styles.separator}>·</Text>{' '}
-          {community.members ?? community.description}
+          {community.topic} <Text style={styles.separator}>·</Text> {community.description}
         </Text>
       </View>
 
       <View style={styles.activity}>
-        {community.activeNow !== undefined ? (
-          <>
-            <View style={styles.activityDot} />
-            <Text style={styles.activityText}>{community.activeNow}</Text>
-          </>
-        ) : (
-          <Text style={styles.accessText}>{community.access}</Text>
-        )}
+        <Text style={styles.accessText}>{community.access}</Text>
       </View>
     </>
   );
@@ -114,17 +106,6 @@ function makeStyles(colors: ReturnType<typeof useAppTheme>) {
       alignItems: 'center',
       gap: spacing.xs,
       paddingLeft: spacing.xs,
-    },
-    activityDot: {
-      width: 7,
-      height: 7,
-      borderRadius: 4,
-      backgroundColor: colors.positive,
-    },
-    activityText: {
-      color: colors.inkMuted,
-      fontSize: typeScale.caption,
-      fontVariant: ['tabular-nums'],
     },
     accessText: {
       color: colors.inkMuted,
