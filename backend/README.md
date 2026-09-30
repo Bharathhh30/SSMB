@@ -1,8 +1,8 @@
 # Community API
 
 The API is a FastAPI modular monolith. Public endpoints are versioned under
-`/api/v1`. This first slice provides a liveness endpoint only; it does not
-claim that PostgreSQL or other dependencies are ready yet.
+`/api/v1`. PostgreSQL runs locally in Docker Compose, SQLAlchemy uses its async
+PostgreSQL driver, and Alembic is configured for future schema revisions.
 
 ## Local development
 
@@ -10,12 +10,40 @@ From the repository root:
 
 ```powershell
 Set-Location backend
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 uv sync --locked
+docker compose up -d db
+uv run --locked alembic upgrade head
 uv run uvicorn app.main:app --reload
 ```
 
-The liveness endpoint is `http://127.0.0.1:8000/api/v1/health`. Interactive API
-docs are available at `http://127.0.0.1:8000/docs` in development only.
+The API liveness endpoint is `http://127.0.0.1:8000/api/v1/health`; database
+readiness is `http://127.0.0.1:8000/api/v1/health/ready`. Interactive API docs
+are available at `http://127.0.0.1:8000/docs` in development only.
+
+The database port is bound to loopback only. Do not expose PostgreSQL through a
+tunnel; expose the API instead. `.env.example` contains local-only development
+credentials and must never be reused for staging or production.
+
+## Database migrations
+
+The initial Alembic revision creates the authentication-independent `users`
+identity record and the foundational `communities` table, including ownership,
+access-type constraints, expiry, and lookup indexes. Authentication-specific
+credentials are intentionally not stored in this schema; the authentication
+approach remains a separate product decision.
+
+Alembic's asynchronous environment uses `Base.metadata` and `DATABASE_URL`.
+Apply schema changes only through reviewed revisions; do not use ORM auto-create
+in application startup. Generate later revisions with:
+
+```powershell
+uv run --locked alembic revision --autogenerate -m "describe the schema change"
+```
+
+Review the generated upgrade and downgrade operations before applying them.
+Production migrations remain a controlled deployment step and must not run
+automatically on every API replica.
 
 Run checks with:
 
@@ -33,7 +61,6 @@ credentials.
 ## Health semantics
 
 `GET /api/v1/health` is a liveness check: it confirms that the API process can
-serve requests. It intentionally does not report database readiness. A
-readiness check will be added alongside the PostgreSQL connection and migration
-foundation, when it can verify those dependencies rather than return a
-misleading success.
+serve requests. `GET /api/v1/health/ready` executes `SELECT 1` and returns 503
+if the database is missing or unreachable, so an API process is not reported
+ready while its required database is unavailable.

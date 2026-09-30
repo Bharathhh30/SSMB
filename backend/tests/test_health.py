@@ -7,6 +7,10 @@ from app.core.config import Settings
 from app.main import create_app
 
 
+def make_test_app(app_env: str = "test") -> FastAPI:
+    return create_app(Settings(app_env=app_env, database_url=None))
+
+
 async def request(app: FastAPI, path: str) -> Response:
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -20,7 +24,7 @@ def get(app: FastAPI, path: str) -> Response:
 
 
 def test_health_endpoint_reports_liveness() -> None:
-    response = get(create_app(Settings(app_env="test")), "/api/v1/health")
+    response = get(make_test_app(), "/api/v1/health")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -31,17 +35,26 @@ def test_health_endpoint_reports_liveness() -> None:
 
 
 def test_api_routes_are_versioned() -> None:
-    response = get(create_app(Settings(app_env="test")), "/health")
+    response = get(make_test_app(), "/health")
     assert response.status_code == 404
 
 
+def test_readiness_fails_closed_without_database_configuration() -> None:
+    app = make_test_app()
+
+    response = get(app, "/api/v1/health/ready")
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Database is not configured"}
+
+
 def test_interactive_docs_are_not_exposed_outside_development() -> None:
-    app = create_app(Settings(app_env="production"))
+    app = make_test_app("production")
     assert get(app, "/docs").status_code == 404
     assert get(app, "/openapi.json").status_code == 404
 
 
 def test_interactive_docs_are_available_in_development() -> None:
-    app = create_app(Settings(app_env="development"))
+    app = make_test_app("development")
     assert get(app, "/docs").status_code == 200
     assert get(app, "/openapi.json").status_code == 200
