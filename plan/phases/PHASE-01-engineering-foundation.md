@@ -28,6 +28,7 @@
 - [x] Add the FastAPI health/discovery API, PostgreSQL configuration, initial users/communities schema, Alembic revision, and explicit development seed.
 - [x] Add typed mobile API URL configuration, request/error handling, and a GitHub Actions PR workflow with a PostgreSQL service.
 - [x] Add mobile API contract unit tests and wire them into pull-request CI.
+- [x] Surface validated server request IDs as selectable references in mobile API error states.
 - [x] Add a non-root API container image and CI build/readiness smoke-test definition.
 - [x] Add request IDs and redacted structured HTTP logs with a generic unexpected-error response.
 - [ ] Run the migration and readiness endpoint against the developer's live local PostgreSQL service.

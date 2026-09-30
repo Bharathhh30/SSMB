@@ -11,6 +11,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppSymbol } from '@/components/app-symbol';
+import { ApiRequestReference } from '@/components/api-request-reference';
 import { MotionPressable } from '@/components/motion-pressable';
 import { CommunityRow } from '@/features/communities/components/community-row';
 import {
@@ -175,6 +176,7 @@ export default function DiscoverScreen() {
       <View style={styles.statePanel}>
         <Text style={styles.emptyTitle}>Can’t load communities</Text>
         <Text style={styles.stateMessage}>{communityQuery.error?.message}</Text>
+        <ApiRequestReference requestId={communityQuery.error?.requestId} />
         <MotionPressable
           accessibilityLabel="Retry loading communities"
           onPress={communityQuery.retry}
@@ -213,6 +215,7 @@ export default function DiscoverScreen() {
         ) : communityQuery.loadingMoreError ? (
           <>
             <Text style={styles.stateMessage}>{communityQuery.loadingMoreError.message}</Text>
+            <ApiRequestReference requestId={communityQuery.loadingMoreError.requestId} />
             <MotionPressable
               accessibilityLabel="Retry loading more communities"
               onPress={communityQuery.retryLoadingMore}

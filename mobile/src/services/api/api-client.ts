@@ -3,6 +3,7 @@ import { getApiBaseUrl } from '@/config/env';
 import { ApiError } from './api-error';
 
 const REQUEST_TIMEOUT_MS = 12_000;
+const REQUEST_ID_PATTERN = /^[0-9a-f]{32}$/i;
 
 type JsonRequestOptions = {
   signal?: AbortSignal;
@@ -13,6 +14,11 @@ function getErrorMessage(status: number): string {
     return 'The community service is having trouble. Please try again.';
   }
   return `The request could not be completed (HTTP ${status}).`;
+}
+
+function getRequestId(response: Response): string | undefined {
+  const requestId = response.headers.get('x-request-id')?.trim();
+  return requestId && REQUEST_ID_PATTERN.test(requestId) ? requestId.toLowerCase() : undefined;
 }
 
 export async function getJson(
@@ -47,15 +53,21 @@ export async function getJson(
       headers: { Accept: 'application/json' },
       signal: timeoutController.signal,
     });
+    const requestId = getRequestId(response);
 
     if (!response.ok) {
-      throw new ApiError(getErrorMessage(response.status), 'http', response.status);
+      throw new ApiError(getErrorMessage(response.status), 'http', response.status, requestId);
     }
 
     try {
       return await response.json();
     } catch {
-      throw new ApiError('The server returned a response we could not read.', 'response');
+      throw new ApiError(
+        'The server returned a response we could not read.',
+        'response',
+        undefined,
+        requestId,
+      );
     }
   } catch (error) {
     if (signal?.aborted) {

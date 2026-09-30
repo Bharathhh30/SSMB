@@ -44,21 +44,49 @@ describe('getJson', () => {
   });
 
   it('converts HTTP errors to safe, typed API errors', async () => {
-    fetchMock.mockResolvedValue(new Response('private upstream details', { status: 503 }));
+    const requestId = '9b6e0918532c45c8b8ff3e4a7264ab12';
+    fetchMock.mockResolvedValue(
+      new Response('private upstream details', {
+        status: 503,
+        headers: { 'X-Request-ID': requestId },
+      }),
+    );
 
     await expect(getJson('/communities')).rejects.toMatchObject({
       kind: 'http',
       message: 'The community service is having trouble. Please try again.',
+      requestId,
       status: 503,
     });
   });
 
   it('reports malformed JSON as a response error', async () => {
-    fetchMock.mockResolvedValue(new Response('not-json', { status: 200 }));
+    const requestId = 'c4f0a50f5ae14a699fb776610abea035';
+    fetchMock.mockResolvedValue(
+      new Response('not-json', {
+        status: 200,
+        headers: { 'X-Request-ID': requestId },
+      }),
+    );
 
     await expect(getJson('/communities')).rejects.toMatchObject({
       kind: 'response',
       message: 'The server returned a response we could not read.',
+      requestId,
+    });
+  });
+
+  it('ignores malformed request IDs supplied by an unexpected server', async () => {
+    fetchMock.mockResolvedValue(
+      new Response('upstream failure', {
+        status: 500,
+        headers: { 'X-Request-ID': 'invalid-id-with-user-data' },
+      }),
+    );
+
+    await expect(getJson('/communities')).rejects.toMatchObject({
+      kind: 'http',
+      requestId: undefined,
     });
   });
 

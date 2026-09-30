@@ -17,6 +17,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { AppSymbol } from '@/components/app-symbol';
+import { ApiRequestReference } from '@/components/api-request-reference';
 import { MotionPressable } from '@/components/motion-pressable';
 import { toCommunityCard } from '@/features/communities/data/communities';
 import { useCommunityDetail } from '@/features/communities/hooks/use-community-detail';
@@ -115,6 +116,7 @@ export default function CommunityDetailScreen() {
               ? 'It may be invite-only, expired, or no longer available.'
               : communityQuery.error?.message}
           </Text>
+          <ApiRequestReference requestId={communityQuery.error?.requestId} />
           {!isNotFound ? (
             <MotionPressable
               accessibilityLabel="Retry opening this community"
