@@ -1,20 +1,28 @@
-import { Link, Stack } from 'expo-router';
-import { StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { Text, View } from '@/components/Themed';
+import { MotionPressable } from '@/components/motion-pressable';
+import { radius, spacing, typeScale, useAppTheme } from '@/theme';
 
 export default function NotFoundScreen() {
-  return (
-    <>
-      <Stack.Screen options={{ title: 'Oops!' }} />
-      <View style={styles.container}>
-        <Text style={styles.title}>This screen doesn't exist.</Text>
+  const colors = useAppTheme();
+  const router = useRouter();
 
-        <Link href="/" style={styles.link}>
-          <Text style={styles.linkText}>Go to home screen!</Text>
-        </Link>
-      </View>
-    </>
+  return (
+    <View style={[styles.container, { backgroundColor: colors.canvas }]}>
+      <Text style={[styles.eyebrow, { color: colors.accent }]}>A LITTLE OFF THE MAP</Text>
+      <Text style={[styles.title, { color: colors.ink }]}>This circle isn’t here.</Text>
+      <Text style={[styles.copy, { color: colors.inkMuted }]}>
+        The page may have moved. Let’s get you back to your community space.
+      </Text>
+      <MotionPressable
+        accessibilityLabel="Back to home"
+        onPress={() => router.replace('/')}
+        style={[styles.action, { backgroundColor: colors.accent }]}
+      >
+        <Text style={[styles.actionText, { color: colors.heroInk }]}>Back to home</Text>
+      </MotionPressable>
+    </View>
   );
 }
 
@@ -23,18 +31,36 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    padding: spacing.xl,
+    gap: spacing.md,
+  },
+  eyebrow: {
+    fontSize: typeScale.caption,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
   title: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: typeScale.title,
+    fontWeight: '700',
+    textAlign: 'center',
   },
-  link: {
-    marginTop: 15,
-    paddingVertical: 15,
+  copy: {
+    maxWidth: 320,
+    fontSize: typeScale.body,
+    lineHeight: 23,
+    textAlign: 'center',
   },
-  linkText: {
-    fontSize: 14,
-    color: '#2e78b7',
+  action: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.full,
+    borderCurve: 'continuous',
+    marginTop: spacing.xs,
+  },
+  actionText: {
+    fontSize: typeScale.footnote,
+    fontWeight: '700',
   },
 });
