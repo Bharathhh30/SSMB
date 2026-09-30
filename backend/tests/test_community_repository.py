@@ -30,6 +30,7 @@ def test_discovery_query_uses_public_filters_and_bound_pagination() -> None:
 
     assert "communities.access_type =" in compiled.string
     assert "communities.expires_at IS NULL" in compiled.string
+    assert "trim(communities.topic) =" in compiled.string
     assert " LIMIT " in compiled.string
     assert " OFFSET " in compiled.string
     assert "open" in parameters

@@ -33,7 +33,7 @@ async def list_communities(
             )
         )
     if topic:
-        filters.append(Community.topic == topic)
+        filters.append(func.trim(Community.topic) == topic)
 
     total = await session.scalar(select(func.count()).select_from(Community).where(*filters))
     statement = (
