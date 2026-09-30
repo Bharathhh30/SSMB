@@ -45,6 +45,7 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v10.2.0
         with:
+          version: 0.12.21
           enable-cache: true
 
       - name: Install locked backend dependencies
@@ -73,6 +74,29 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://community_test:ci-only-password@127.0.0.1:5432/community_test
           TEST_DATABASE_URL: postgresql+asyncpg://community_test:ci-only-password@127.0.0.1:5432/community_test
         run: uv run --locked pytest
+
+      - name: Build and smoke-test API container
+        env:
+          DATABASE_URL: postgresql+asyncpg://community_test:ci-only-password@127.0.0.1:5432/community_test
+        run: |
+          docker build --pull --file backend/Dockerfile --tag community-api:ci backend
+          docker run --detach --rm --name community-api-ci --network host \
+            --env APP_ENV=test \
+            --env DATABASE_URL="$DATABASE_URL" \
+            --env PORT=8000 \
+            community-api:ci
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/api/v1/health/ready; then
+              docker stop community-api-ci
+              exit 0
+            fi
+            sleep 1
+          done
+
+          docker logs community-api-ci || true
+          docker stop community-api-ci || true
+          exit 1
 
   mobile:
     name: Mobile / Expo

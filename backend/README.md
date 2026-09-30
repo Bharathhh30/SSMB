@@ -30,6 +30,39 @@ The explicit seed command creates five repeatable demo communities and one demo
 owner. It refuses to run unless `APP_ENV=development`; no seed data is inserted
 automatically when the API starts.
 
+## Container image
+
+The production image is built from the locked runtime dependencies, runs as a
+non-root user, and exposes port `8000` (or the platform-provided `PORT`). Its
+container health check uses the liveness endpoint; use `/api/v1/health/ready`
+for deployment readiness because that endpoint also checks PostgreSQL.
+
+Build it from this directory:
+
+```powershell
+docker build --pull --file Dockerfile --tag community-api:local .
+```
+
+For a local Docker invocation, use an ignored `.env.production` file containing
+the required production environment/secrets. In a hosting platform, configure
+those values through its secret manager and override the container command:
+
+```powershell
+docker run --rm --env-file .env.production community-api:local alembic upgrade head
+```
+
+For deployment, provide `APP_ENV=production` and `DATABASE_URL` through the
+hosting platform's secret/environment configuration. Run
+`alembic upgrade head` once as a controlled release job before routing traffic;
+the application image never applies migrations at startup. Keep the database
+private and do not put credentials in the image or build arguments.
+
+CI is configured to build the image and start it against the PostgreSQL
+service after applying the migration, then probe the readiness endpoint. The
+workflow still needs a successful GitHub run. The image is provider-neutral;
+pushing it to a registry and deploying it still requires the hosting and
+registry choices recorded in the roadmap.
+
 ## Database migrations
 
 The initial Alembic revision creates the authentication-independent `users`
