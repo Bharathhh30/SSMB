@@ -29,6 +29,7 @@
 - [x] Add typed mobile API URL configuration, request/error handling, and a GitHub Actions PR workflow with a PostgreSQL service.
 - [x] Add mobile API contract unit tests and wire them into pull-request CI.
 - [x] Add a non-root API container image and CI build/readiness smoke-test definition.
+- [x] Add request IDs and redacted structured HTTP logs with a generic unexpected-error response.
 - [ ] Run the migration and readiness endpoint against the developer's live local PostgreSQL service.
 - [ ] Confirm the first GitHub Actions run passes, including the PostgreSQL repository integration test.
 - [ ] Configure required branch protections, environment-specific deployment targets/secrets, and EAS build profiles.
