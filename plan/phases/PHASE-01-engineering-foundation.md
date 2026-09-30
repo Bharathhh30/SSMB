@@ -27,6 +27,7 @@
 - [x] Replace template demo screens with themed Home and API-backed Discover flows.
 - [x] Add the FastAPI health/discovery API, PostgreSQL configuration, initial users/communities schema, Alembic revision, and explicit development seed.
 - [x] Add typed mobile API URL configuration, request/error handling, and a GitHub Actions PR workflow with a PostgreSQL service.
+- [x] Add mobile API contract unit tests and wire them into pull-request CI.
 - [ ] Run the migration and readiness endpoint against the developer's live local PostgreSQL service.
 - [ ] Confirm the first GitHub Actions run passes, including the PostgreSQL repository integration test.
 - [ ] Configure required branch protections, environment-specific deployment targets/secrets, and EAS build profiles.

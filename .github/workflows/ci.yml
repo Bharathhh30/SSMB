@@ -98,6 +98,9 @@ jobs:
       - name: Check Expo dependency compatibility
         run: npx expo install --check
 
+      - name: Run mobile unit tests
+        run: npm run test:unit
+
       - name: Generate Expo Router types and export web app
         run: npx expo export --platform web
 
