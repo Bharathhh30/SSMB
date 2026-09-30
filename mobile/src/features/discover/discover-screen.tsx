@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -144,6 +145,24 @@ export default function DiscoverScreen() {
           })}
         </ScrollView>
 
+        {communityQuery.refreshError ? (
+          <View accessibilityRole="alert" style={styles.refreshError}>
+            <View style={styles.refreshErrorCopy}>
+              <Text style={styles.topicNotice}>
+                Couldn’t refresh. Showing the results already loaded.
+              </Text>
+              <ApiRequestReference requestId={communityQuery.refreshError.requestId} />
+            </View>
+            <MotionPressable
+              accessibilityLabel="Retry refreshing communities"
+              onPress={() => void communityQuery.refresh()}
+              style={styles.topicRetry}
+            >
+              <Text style={styles.topicRetryText}>Retry</Text>
+            </MotionPressable>
+          </View>
+        ) : null}
+
         {topicQuery.status === 'loading' ? (
           <Text accessibilityRole="text" style={styles.topicNotice}>
             Loading topics…
@@ -196,6 +215,8 @@ export default function DiscoverScreen() {
       topicQuery.error?.requestId,
       topicQuery.retry,
       topicQuery.status,
+      communityQuery.refresh,
+      communityQuery.refreshError?.requestId,
     ],
   );
 
@@ -282,6 +303,15 @@ export default function DiscoverScreen() {
         data={displayedCommunities}
         keyboardShouldPersistTaps="handled"
         keyExtractor={(item) => item.id}
+        refreshControl={
+          <RefreshControl
+            colors={[colors.accent]}
+            onRefresh={() => void communityQuery.refresh()}
+            progressBackgroundColor={colors.surface}
+            refreshing={communityQuery.isRefreshing}
+            tintColor={colors.accent}
+          />
+        }
         renderItem={renderCommunity}
         showsVerticalScrollIndicator={false}
       />
@@ -379,6 +409,22 @@ function makeStyles(colors: ReturnType<typeof useAppTheme>) {
     topicNotice: {
       color: colors.inkMuted,
       fontSize: typeScale.caption,
+    },
+    refreshError: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+      padding: spacing.sm,
+      backgroundColor: colors.surface,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.hairline,
+      borderRadius: radius.md,
+      borderCurve: 'continuous',
+    },
+    refreshErrorCopy: {
+      flex: 1,
+      gap: spacing.xxs,
     },
     topicRetry: {
       minHeight: 40,

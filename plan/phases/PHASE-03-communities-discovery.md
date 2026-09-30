@@ -15,6 +15,7 @@
 ## Read-only preview slice delivered ahead of the phase gate
 
 - [x] Derive the public topic filter list from active, open communities through `GET /api/v1/topics`; show retry/fallback states when the list is unavailable.
+- [x] Add native pull-to-refresh for Discover while preserving loaded results when a refresh fails, with an inline retry and support reference.
 - [x] Open the public community preview from Discover.
 - [x] Share the preview using the native share sheet and an app deep link.
 - [x] Reveal fetched preview content with reduced-motion-aware entrance motion.

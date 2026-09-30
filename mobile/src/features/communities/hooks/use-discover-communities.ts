@@ -5,41 +5,33 @@ import { ApiError } from '@/services/api/api-error';
 import {
   fetchCommunities,
   type ApiCommunity,
-  type CommunityPage,
 } from '../api/communities-api';
+import {
+  beginDiscoverRefresh,
+  completeDiscoverRefresh,
+  failDiscoverRefresh,
+  initialDiscoverQuerySnapshot,
+  type DiscoverQuerySnapshot,
+} from '../state/discover-query-state';
 
 const PAGE_SIZE = 30;
 const SEARCH_DEBOUNCE_MS = 250;
 
-type QuerySnapshot = {
-  key: string;
-  status: 'loading' | 'success' | 'error';
-  pages: CommunityPage[];
-  error: ApiError | null;
-  isLoadingMore: boolean;
-  loadingMoreError: ApiError | null;
-};
-
-const initialSnapshot: QuerySnapshot = {
-  key: '',
-  status: 'loading',
-  pages: [],
-  error: null,
-  isLoadingMore: false,
-  loadingMoreError: null,
-};
-
 export function useDiscoverCommunities(query: string, topic?: string) {
   const normalizedQuery = query.trim();
   const queryKey = JSON.stringify([normalizedQuery, topic ?? null]);
-  const [snapshot, setSnapshot] = useState(initialSnapshot);
+  const [snapshot, setSnapshot] = useState<DiscoverQuerySnapshot>(
+    initialDiscoverQuerySnapshot,
+  );
   const [retryCount, setRetryCount] = useState(0);
   const initialRequest = useRef<AbortController | null>(null);
+  const refreshRequest = useRef<AbortController | null>(null);
   const nextPageRequest = useRef<AbortController | null>(null);
   const isLoadingMoreRef = useRef(false);
 
   useEffect(() => {
     initialRequest.current?.abort();
+    refreshRequest.current?.abort();
     nextPageRequest.current?.abort();
     isLoadingMoreRef.current = false;
 
@@ -50,6 +42,8 @@ export function useDiscoverCommunities(query: string, topic?: string) {
       status: 'loading',
       pages: [],
       error: null,
+      isRefreshing: false,
+      refreshError: null,
       isLoadingMore: false,
       loadingMoreError: null,
     });
@@ -69,6 +63,8 @@ export function useDiscoverCommunities(query: string, topic?: string) {
               status: 'success',
               pages: [page],
               error: null,
+              isRefreshing: false,
+              refreshError: null,
               isLoadingMore: false,
               loadingMoreError: null,
             });
@@ -86,6 +82,8 @@ export function useDiscoverCommunities(query: string, topic?: string) {
               error instanceof ApiError
                 ? error
                 : new ApiError('Could not load communities. Please try again.', 'network'),
+            isRefreshing: false,
+            refreshError: null,
             isLoadingMore: false,
             loadingMoreError: null,
           });
@@ -95,6 +93,7 @@ export function useDiscoverCommunities(query: string, topic?: string) {
     return () => {
       clearTimeout(timer);
       controller.abort();
+      refreshRequest.current?.abort();
       if (initialRequest.current === controller) {
         initialRequest.current = null;
       }
@@ -110,13 +109,64 @@ export function useDiscoverCommunities(query: string, topic?: string) {
     snapshot.key === queryKey
       ? snapshot
       : {
-          ...initialSnapshot,
+          ...initialDiscoverQuerySnapshot,
           key: queryKey,
         };
+
+  const refresh = useCallback(async () => {
+    if (currentSnapshot.status !== 'success' || refreshRequest.current) {
+      return;
+    }
+
+    initialRequest.current?.abort();
+    nextPageRequest.current?.abort();
+    isLoadingMoreRef.current = false;
+
+    const controller = new AbortController();
+    refreshRequest.current = controller;
+    setSnapshot((current) =>
+      current.key === queryKey ? beginDiscoverRefresh(current) : current,
+    );
+
+    try {
+      const page = await fetchCommunities({
+        q: normalizedQuery || undefined,
+        topic,
+        limit: PAGE_SIZE,
+        offset: 0,
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) {
+        return;
+      }
+      setSnapshot((current) =>
+        current.key === queryKey ? completeDiscoverRefresh(current, page) : current,
+      );
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        const refreshError =
+          error instanceof ApiError
+            ? error
+            : new ApiError(
+                'Could not refresh communities. Showing saved results.',
+                'network',
+              );
+        setSnapshot((current) =>
+          current.key === queryKey ? failDiscoverRefresh(current, refreshError) : current,
+        );
+      }
+    } finally {
+      if (refreshRequest.current === controller) {
+        refreshRequest.current = null;
+      }
+    }
+  }, [currentSnapshot.status, normalizedQuery, queryKey, topic]);
 
   const loadMore = useCallback(async () => {
     if (
       currentSnapshot.status !== 'success' ||
+      refreshRequest.current !== null ||
+      currentSnapshot.isRefreshing ||
       currentSnapshot.isLoadingMore ||
       isLoadingMoreRef.current
     ) {
@@ -205,7 +255,10 @@ export function useDiscoverCommunities(query: string, topic?: string) {
     hasNextPage: items.length < (lastPage?.total ?? 0),
     isLoadingMore: currentSnapshot.isLoadingMore,
     loadingMoreError: currentSnapshot.loadingMoreError,
+    isRefreshing: currentSnapshot.isRefreshing,
+    refreshError: currentSnapshot.refreshError,
     retry,
+    refresh,
     loadMore,
     retryLoadingMore,
   };

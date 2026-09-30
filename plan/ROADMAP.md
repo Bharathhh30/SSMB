@@ -318,7 +318,8 @@ Mobile API errors surface validated request IDs as selectable support references
 Home is a guest-safe welcome and topic launcher, not a fictional joined-community
 dashboard; the member dashboard remains pending identity/membership. Discover
 uses the API and has loading, error, empty, search, topic-filter, and pagination
-states. Its available topic filters now come from `GET /api/v1/topics`, which
+states, including pull-to-refresh that retains loaded results on refresh failure.
+Its available topic filters now come from `GET /api/v1/topics`, which
 lists distinct topics with active open communities; Home and Discover handle
 topic loading/failure without blocking the all-communities view. The API
 intentionally does not return invite-only communities until a
