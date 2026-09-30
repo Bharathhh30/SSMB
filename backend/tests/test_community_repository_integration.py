@@ -43,6 +43,7 @@ def test_discovery_filters_private_and_expired_rows_and_paginates() -> None:
                         display_name="Repository integration test",
                     )
                 )
+                await session.flush()
                 session.add_all(
                     [
                         Community(
