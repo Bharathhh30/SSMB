@@ -117,3 +117,5 @@ ready while its required database is unavailable.
 supports `q`, `topic`, `limit` (maximum 100), and `offset`. Until a separate
 public-preview policy is defined, unauthenticated discovery returns only
 open-access communities; it does not expose invite-only community metadata.
+`GET /api/v1/topics` lists distinct trimmed topics that currently have at least
+one unexpired open community. Topic filtering uses the same trimmed value.

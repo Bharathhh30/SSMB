@@ -8,7 +8,11 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.features.communities.models import Community
-from app.features.communities.repository import get_public_community, list_communities
+from app.features.communities.repository import (
+    get_public_community,
+    list_communities,
+    list_public_topics,
+)
 from app.features.users.models import User
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
@@ -24,7 +28,7 @@ def test_discovery_filters_private_and_expired_rows_and_paginates() -> None:
     async def run() -> None:
         engine = create_async_engine(TEST_DATABASE_URL)
         owner_id = uuid4()
-        active_ids = [uuid4(), uuid4()]
+        active_ids = [uuid4(), uuid4(), uuid4()]
         expired_id = uuid4()
         private_id = uuid4()
         suffix = uuid4().hex
@@ -60,11 +64,20 @@ def test_discovery_filters_private_and_expired_rows_and_paginates() -> None:
                             access_type="open",
                         ),
                         Community(
+                            id=active_ids[2],
+                            owner_id=owner_id,
+                            name=f"Community {suffix} Gamma",
+                            slug=f"community-{suffix}-gamma",
+                            topic=" Integration ",
+                            description="A visible result with whitespace around its topic.",
+                            access_type="open",
+                        ),
+                        Community(
                             id=expired_id,
                             owner_id=owner_id,
                             name=f"Community {suffix} Expired",
                             slug=f"community-{suffix}-expired",
-                            topic="Integration",
+                            topic="Expired only",
                             description="This expired result must not be discoverable.",
                             access_type="open",
                             expires_at=now - timedelta(days=1),
@@ -74,7 +87,7 @@ def test_discovery_filters_private_and_expired_rows_and_paginates() -> None:
                             owner_id=owner_id,
                             name=f"Community {suffix} Private",
                             slug=f"community-{suffix}-private",
-                            topic="Integration",
+                            topic="Invite only",
                             description="This invite-only result must not be public.",
                             access_type="invite_only",
                         ),
@@ -99,7 +112,7 @@ def test_discovery_filters_private_and_expired_rows_and_paginates() -> None:
                         session,
                         query=f"Community {suffix}",
                         topic="Integration",
-                        limit=1,
+                        limit=2,
                         offset=0,
                     )
                     second_page, second_total = await list_communities(
@@ -107,16 +120,18 @@ def test_discovery_filters_private_and_expired_rows_and_paginates() -> None:
                         query=f"Community {suffix}",
                         topic="Integration",
                         limit=1,
-                        offset=1,
+                        offset=2,
                     )
+                    topics = await list_public_topics(session)
 
                     assert public_detail is not None
                     assert public_detail.id == active_ids[0]
                     assert private_detail is None
                     assert expired_detail is None
-                    assert total == second_total == 2
-                    assert [community.id for community in first_page] == [active_ids[0]]
-                    assert [community.id for community in second_page] == [active_ids[1]]
+                    assert total == second_total == 3
+                    assert [community.id for community in first_page] == active_ids[:2]
+                    assert [community.id for community in second_page] == [active_ids[2]]
+                    assert topics == ["Integration"]
                 finally:
                     await session.execute(
                         delete(Community).where(
