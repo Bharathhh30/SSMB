@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, staging, main]
+  push:
+    branches: [develop, staging, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend / PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: community_test
+          POSTGRES_USER: community_test
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U community_test -d community_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+
+      - name: Install locked backend dependencies
+        working-directory: backend
+        run: uv sync --locked --all-groups
+
+      - name: Check formatting and lint
+        working-directory: backend
+        run: |
+          uv run --locked ruff format --check .
+          uv run --locked ruff check .
+
+      - name: Apply migrations to PostgreSQL
+        working-directory: backend
+        env:
+          APP_ENV: test
+          DATABASE_URL: postgresql+asyncpg://community_test:ci-only-password@127.0.0.1:5432/community_test
+        run: |
+          uv run --locked alembic upgrade head
+          uv run --locked alembic current
+
+      - name: Run backend tests
+        working-directory: backend
+        env:
+          APP_ENV: test
+          DATABASE_URL: postgresql+asyncpg://community_test:ci-only-password@127.0.0.1:5432/community_test
+          TEST_DATABASE_URL: postgresql+asyncpg://community_test:ci-only-password@127.0.0.1:5432/community_test
+        run: uv run --locked pytest
+
+  mobile:
+    name: Mobile / Expo
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install locked mobile dependencies
+        run: npm ci
+
+      - name: Check Expo dependency compatibility
+        run: npx expo install --check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Export web app
+        run: npx expo export --platform web
+
+      - name: Export iOS and Android JavaScript bundles
+        run: npx expo export --platform ios --platform android
+
+      - name: Audit npm dependencies
+        run: npm audit --audit-level=high
