@@ -311,8 +311,8 @@ mobile API URL configuration, a read-only public community preview route with
 native-share support and reduced-motion-aware content entrance are implemented.
 A non-root backend container build definition is in place. GitHub Actions CI
 includes mobile API contract tests and is configured to build/smoke-test that
-image. The preview link is an app deep link, not an invite link or production
-HTTPS universal link.
+image. The API adds request IDs and redacted structured access logs. The preview
+link is an app deep link, not an invite link or production HTTPS universal link.
 
 The Home screen still uses fixture data. Discover uses the API and has loading,
 error, empty, search, topic-filter, and pagination states. The API intentionally

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from app import __version__
 from app.api.v1.router import api_router
 from app.core.config import Settings, get_settings
+from app.core.http_logging import RequestLoggingMiddleware
 from app.db.engine import create_database_engine
 
 API_V1_PREFIX = "/api/v1"
@@ -43,6 +44,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     application.state.database_engine = None
     application.state.database_session_factory = None
+    application.add_middleware(RequestLoggingMiddleware)
     application.include_router(api_router, prefix=API_V1_PREFIX)
     return application
 

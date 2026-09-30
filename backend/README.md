@@ -15,7 +15,7 @@ uv sync --locked
 docker compose up -d db
 uv run --locked alembic upgrade head
 uv run --locked python -m app.scripts.seed_development
-uv run uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload --no-access-log
 ```
 
 The API liveness endpoint is `http://127.0.0.1:8000/api/v1/health`; database
@@ -95,6 +95,16 @@ Commit `uv.lock` so local and CI installs use the same dependency versions. The
 API reads non-secret settings from the process environment. Copy `.env.example`
 to `.env` only for local overrides; never commit `.env` or production
 credentials.
+
+## Request logging
+
+Each HTTP response includes a server-generated `X-Request-ID`. The API emits a
+JSON request event with the method, matched route template, status, duration,
+and request ID; it deliberately omits the raw URL, query values, headers, and
+body. Unexpected exceptions return a generic 500 response and log only the
+exception type, so operators can correlate reports without exposing exception
+messages to clients or access logs. The documented Uvicorn commands disable
+the separate access log to avoid duplicate, less-redacted URL logging.
 
 ## Health and community discovery
 
