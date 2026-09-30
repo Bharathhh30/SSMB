@@ -1,6 +1,15 @@
-import { useMemo } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import * as Linking from 'expo-linking';
 
 import { AppSymbol } from '@/components/app-symbol';
 import { MotionPressable } from '@/components/motion-pressable';
@@ -14,12 +23,44 @@ export default function CommunityDetailScreen() {
   const router = useRouter();
   const { slug } = useLocalSearchParams<{ slug?: string }>();
   const communityQuery = useCommunityDetail(slug ?? '');
+  const [isSharing, setIsSharing] = useState(false);
   const community = communityQuery.community
     ? toCommunityCard(communityQuery.community)
     : null;
   const expiresAt = communityQuery.community?.expires_at;
   const tone = community ? colors.community[community.tone] : null;
   const isNotFound = communityQuery.error?.status === 404;
+
+  async function sharePreview() {
+    const apiCommunity = communityQuery.community;
+    if (!apiCommunity || isSharing) {
+      return;
+    }
+
+    setIsSharing(true);
+    try {
+      // Community names come from the API. Keep shared text on one predictable line.
+      const safeName =
+        apiCommunity.name
+          .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 120) || 'this community';
+      const slugPlaceholder = 'community-preview-slug';
+      const previewUrl = Linking.createURL(
+        `communities/${slugPlaceholder}`,
+      ).replace(slugPlaceholder, encodeURIComponent(apiCommunity.slug));
+
+      await Share.share({
+        title: `Share ${safeName}`,
+        message: `Take a look at ${safeName} on Community:\n${previewUrl}`,
+      });
+    } catch {
+      Alert.alert('Unable to share', 'Please try again in a moment.');
+    } finally {
+      setIsSharing(false);
+    }
+  }
 
   return (
     <View style={styles.screen}>
@@ -105,6 +146,20 @@ export default function CommunityDetailScreen() {
             </View>
           </View>
 
+          <MotionPressable
+            accessibilityLabel={`Share public preview of ${community.name}`}
+            accessibilityState={{ busy: isSharing }}
+            disabled={isSharing}
+            onPress={sharePreview}
+            style={[styles.shareAction, isSharing && styles.shareActionDisabled]}
+            testID="share-community-preview"
+          >
+            <AppSymbol color={colors.accentInk} name="share" size={18} />
+            <Text style={styles.shareActionText}>
+              {isSharing ? 'Preparing share…' : 'Share public preview'}
+            </Text>
+          </MotionPressable>
+
           <View style={styles.section}>
             <Text accessibilityRole="header" style={styles.sectionTitle}>
               About this circle
@@ -180,6 +235,24 @@ function makeStyles(colors: ReturnType<typeof useAppTheme>) {
       borderWidth: 1,
       borderColor: colors.heroAccentOutline,
       borderRadius: 90,
+    },
+    shareAction: {
+      minHeight: 48,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.accentSoft,
+      borderRadius: radius.full,
+      borderCurve: 'continuous',
+    },
+    shareActionDisabled: {
+      opacity: 0.65,
+    },
+    shareActionText: {
+      color: colors.accentInk,
+      fontSize: typeScale.footnote,
+      fontWeight: '700',
     },
     heroTopline: {
       flexDirection: 'row',

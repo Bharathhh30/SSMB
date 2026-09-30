@@ -8,6 +8,11 @@ const symbols = {
   close: { ios: 'xmark', android: 'close', web: 'close' },
   people: { ios: 'person.2.fill', android: 'group', web: 'group' },
   sparkle: { ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' },
+  share: {
+    ios: 'square.and.arrow.up',
+    android: 'ios_share',
+    web: 'share',
+  },
 } satisfies Record<string, SymbolViewProps['name']>;
 
 export type AppSymbolName = keyof typeof symbols;
