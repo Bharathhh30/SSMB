@@ -1,0 +1,45 @@
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# JavaScript / Expo
+node_modules/
+.expo/
+dist/
+web-build/
+coverage/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Native build output and local tooling
+ios/Pods/
+android/.gradle/
+*.keystore
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.agents/
+skills-lock.json
+plan/
+mobile/
