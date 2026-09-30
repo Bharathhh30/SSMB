@@ -96,3 +96,46 @@ def test_discover_validates_pagination_before_querying() -> None:
     assert response.status_code == 422
     session.scalar.assert_not_awaited()
     session.scalars.assert_not_awaited()
+
+
+def test_public_community_detail_returns_a_safe_preview() -> None:
+    community = Community(
+        id=uuid4(),
+        owner_id=uuid4(),
+        name="GATE Quant Lab",
+        slug="gate-quant-lab",
+        topic="Exam prep",
+        description="Focused study sessions.",
+        access_type="open",
+        expires_at=None,
+        created_at=datetime.now(UTC),
+    )
+    session = AsyncMock(spec=AsyncSession)
+    session.scalar.return_value = community
+
+    response = get(make_test_app(session), "/api/v1/communities/gate-quant-lab")
+
+    assert response.status_code == 200
+    assert response.json()["slug"] == "gate-quant-lab"
+    assert response.json()["access_type"] == "open"
+    assert "owner_id" not in response.json()
+    session.scalar.assert_awaited_once()
+
+
+def test_private_or_unknown_community_detail_is_not_disclosed() -> None:
+    session = AsyncMock(spec=AsyncSession)
+    session.scalar.return_value = None
+
+    response = get(make_test_app(session), "/api/v1/communities/private-circle")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Community not found"}
+
+
+def test_community_detail_rejects_invalid_slugs() -> None:
+    session = AsyncMock(spec=AsyncSession)
+
+    response = get(make_test_app(session), "/api/v1/communities/Not-A-Slug")
+
+    assert response.status_code == 422
+    session.scalar.assert_not_awaited()

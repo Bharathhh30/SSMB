@@ -5,6 +5,7 @@ export type CommunityTone = 'sage' | 'apricot' | 'lilac' | 'sky' | 'rose';
 
 export type Community = {
   id: string;
+  slug?: string;
   name: string;
   topic: string;
   description: string;
@@ -109,6 +110,7 @@ export function toCommunityCard(community: ApiCommunity): Community {
 
   return {
     id: community.id,
+    slug: community.slug,
     name: community.name,
     topic: community.topic,
     description: community.description,

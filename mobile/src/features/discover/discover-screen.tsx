@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -8,7 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppSymbol } from '@/components/app-symbol';
 import { MotionPressable } from '@/components/motion-pressable';
@@ -16,6 +16,7 @@ import { CommunityRow } from '@/features/communities/components/community-row';
 import {
   communityTopics,
   toCommunityCard,
+  type Community,
   type CommunityTopic,
 } from '@/features/communities/data/communities';
 import { useDiscoverCommunities } from '@/features/communities/hooks/use-discover-communities';
@@ -32,6 +33,7 @@ export default function DiscoverScreen() {
   const colors = useAppTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { topic: initialTopic } = useLocalSearchParams<{ topic?: string }>();
+  const router = useRouter();
   const [query, setQuery] = useState('');
   const [selectedTopic, setSelectedTopic] = useState<TopicFilter>(
     isCommunityTopic(initialTopic) ? initialTopic : 'All',
@@ -43,6 +45,23 @@ export default function DiscoverScreen() {
   const displayedCommunities = useMemo(
     () => communityQuery.items.map(toCommunityCard),
     [communityQuery.items],
+  );
+  const openCommunity = useCallback(
+    (community: Community) => {
+      if (community.slug) {
+        router.push({
+          pathname: '/communities/[slug]',
+          params: { slug: community.slug },
+        });
+      }
+    },
+    [router],
+  );
+  const renderCommunity = useCallback(
+    ({ item }: { item: Community }) => (
+      <CommunityRow community={item} onPress={() => openCommunity(item)} />
+    ),
+    [openCommunity],
   );
 
   useEffect(() => {
@@ -226,7 +245,7 @@ export default function DiscoverScreen() {
         data={displayedCommunities}
         keyboardShouldPersistTaps="handled"
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <CommunityRow community={item} />}
+        renderItem={renderCommunity}
         showsVerticalScrollIndicator={false}
       />
     </View>

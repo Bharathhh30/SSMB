@@ -4,6 +4,10 @@ from app.features.communities import repository
 from app.features.communities.models import Community
 
 
+async def get_public_community(session: AsyncSession, *, slug: str) -> Community | None:
+    return await repository.get_public_community(session, slug=slug)
+
+
 async def discover_communities(
     session: AsyncSession,
     *,

@@ -307,13 +307,16 @@ Must be resolved in the indicated phase; absence of a choice must not block plan
 **As of 2026-09-30:** Phase 1 remains in progress. The Expo shell, themed Home and
 Discover screens, FastAPI health endpoints, PostgreSQL/Alembic foundation,
 initial users/communities revision, open-community discovery API, centralized
-mobile API URL configuration, and a GitHub Actions CI workflow are implemented.
+mobile API URL configuration, a read-only public community preview route, and a
+GitHub Actions CI workflow are implemented.
 
 The Home screen still uses fixture data. Discover uses the API and has loading,
 error, empty, search, topic-filter, and pagination states. The API intentionally
 does not return invite-only communities until a public-preview policy is
-decided. The development seed command is explicit and refuses to run outside
-`APP_ENV=development`.
+decided. Selecting an open community shows an API-backed preview; join/create,
+membership, and role actions remain out of scope until identity and access
+decisions are complete. The development seed command is explicit and refuses
+to run outside `APP_ENV=development`.
 
 The CI workflow and PostgreSQL integration test have been authored but have not
 yet run on GitHub. The migration was rendered to PostgreSQL offline SQL, but

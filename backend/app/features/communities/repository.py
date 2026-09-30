@@ -43,3 +43,13 @@ async def list_communities(
     )
     communities = await session.scalars(statement)
     return list(communities.all()), total or 0
+
+
+async def get_public_community(session: AsyncSession, *, slug: str) -> Community | None:
+    now = datetime.now(UTC)
+    statement = select(Community).where(
+        Community.slug == slug,
+        Community.access_type == "open",
+        or_(Community.expires_at.is_(None), Community.expires_at > now),
+    )
+    return await session.scalar(statement)

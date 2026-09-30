@@ -38,7 +38,7 @@ function isDateOrNull(value: unknown): value is string | null {
   );
 }
 
-function parseCommunity(value: unknown): ApiCommunity {
+export function parseCommunity(value: unknown): ApiCommunity {
   if (
     !isRecord(value) ||
     typeof value.id !== 'string' ||
@@ -105,4 +105,9 @@ export async function fetchCommunities({
 
   const payload = await getJson(`/communities?${parameters.toString()}`, { signal });
   return parsePage(payload);
+}
+
+export async function fetchCommunity(slug: string, signal?: AbortSignal): Promise<ApiCommunity> {
+  const payload = await getJson(`/communities/${encodeURIComponent(slug)}`, { signal });
+  return parseCommunity(payload);
 }

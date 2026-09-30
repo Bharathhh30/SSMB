@@ -98,11 +98,11 @@ jobs:
       - name: Check Expo dependency compatibility
         run: npx expo install --check
 
+      - name: Generate Expo Router types and export web app
+        run: npx expo export --platform web
+
       - name: Typecheck
         run: npm run typecheck
-
-      - name: Export web app
-        run: npx expo export --platform web
 
       - name: Export iOS and Android JavaScript bundles
         run: npx expo export --platform ios --platform android

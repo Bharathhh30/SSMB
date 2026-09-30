@@ -8,7 +8,7 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.features.communities.models import Community
-from app.features.communities.repository import list_communities
+from app.features.communities.repository import get_public_community, list_communities
 from app.features.users.models import User
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
@@ -83,6 +83,18 @@ def test_discovery_filters_private_and_expired_rows_and_paginates() -> None:
                 await session.commit()
 
                 try:
+                    public_detail = await get_public_community(
+                        session,
+                        slug=f"community-{suffix}-alpha",
+                    )
+                    private_detail = await get_public_community(
+                        session,
+                        slug=f"community-{suffix}-private",
+                    )
+                    expired_detail = await get_public_community(
+                        session,
+                        slug=f"community-{suffix}-expired",
+                    )
                     first_page, total = await list_communities(
                         session,
                         query=f"Community {suffix}",
@@ -98,6 +110,10 @@ def test_discovery_filters_private_and_expired_rows_and_paginates() -> None:
                         offset=1,
                     )
 
+                    assert public_detail is not None
+                    assert public_detail.id == active_ids[0]
+                    assert private_detail is None
+                    assert expired_detail is None
                     assert total == second_total == 2
                     assert [community.id for community in first_page] == [active_ids[0]]
                     assert [community.id for community in second_page] == [active_ids[1]]

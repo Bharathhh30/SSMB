@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { spacing, typeScale, useAppTheme } from '@/theme';
 
@@ -6,19 +6,16 @@ import type { Community } from '../data/communities';
 
 type CommunityRowProps = {
   community: Community;
+  onPress?: () => void;
 };
 
-export function CommunityRow({ community }: CommunityRowProps) {
+export function CommunityRow({ community, onPress }: CommunityRowProps) {
   const colors = useAppTheme();
   const tone = colors.community[community.tone];
   const styles = makeStyles(colors);
-
-  return (
-    <View
-      accessible
-      accessibilityLabel={`${community.name}, ${community.topic}, ${community.access}`}
-      style={styles.row}
-    >
+  const accessibilityLabel = `${community.name}, ${community.topic}, ${community.access}`;
+  const content = (
+    <>
       <View style={[styles.avatar, { backgroundColor: tone.background }]}>
         <Text style={[styles.monogram, { color: tone.foreground }]}>{community.monogram}</Text>
       </View>
@@ -43,7 +40,27 @@ export function CommunityRow({ community }: CommunityRowProps) {
           <Text style={styles.accessText}>{community.access}</Text>
         )}
       </View>
-    </View>
+    </>
+  );
+
+  if (!onPress) {
+    return (
+      <View accessible accessibilityLabel={accessibilityLabel} style={styles.row}>
+        {content}
+      </View>
+    );
+  }
+
+  return (
+    <Pressable
+      accessible
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.row, pressed ? styles.rowPressed : null]}
+    >
+      {content}
+    </Pressable>
   );
 }
 
@@ -57,6 +74,9 @@ function makeStyles(colors: ReturnType<typeof useAppTheme>) {
       alignItems: 'center',
       gap: spacing.md,
       paddingVertical: spacing.sm,
+    },
+    rowPressed: {
+      backgroundColor: colors.surfaceMuted,
     },
     avatar: {
       width: 50,
