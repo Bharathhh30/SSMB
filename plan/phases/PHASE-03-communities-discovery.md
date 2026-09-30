@@ -16,6 +16,7 @@
 
 - [x] Open the public community preview from Discover.
 - [x] Share the preview using the native share sheet and an app deep link.
+- [x] Reveal fetched preview content with reduced-motion-aware entrance motion.
 - [ ] Add HTTPS universal/app links and a web fallback before production sharing; the development Expo Go URL is temporary and requires the development server to remain reachable.
 - [ ] Keep invite links separate and authorization-protected when identity and membership are implemented.
 

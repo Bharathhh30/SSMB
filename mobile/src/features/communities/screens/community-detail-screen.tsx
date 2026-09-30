@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  ScrollView,
   Share,
   StyleSheet,
   Text,
@@ -10,16 +9,34 @@ import {
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeInDown,
+  useReducedMotion,
+} from 'react-native-reanimated';
 
 import { AppSymbol } from '@/components/app-symbol';
 import { MotionPressable } from '@/components/motion-pressable';
 import { toCommunityCard } from '@/features/communities/data/communities';
 import { useCommunityDetail } from '@/features/communities/hooks/use-community-detail';
-import { layout, radius, spacing, typeScale, useAppTheme } from '@/theme';
+import { layout, motion, radius, spacing, typeScale, useAppTheme } from '@/theme';
+
+const contentEntranceEase = Easing.bezier(0.23, 1, 0.32, 1);
+const contentEntering = FadeInDown.withInitialValues({
+  opacity: 0,
+  transform: [{ translateY: motion.contentEntranceOffset }],
+})
+  .duration(motion.contentEntranceDuration)
+  .easing(contentEntranceEase);
+const reducedContentEntering = FadeIn.duration(motion.reducedContentEntranceDuration).easing(
+  contentEntranceEase,
+);
 
 export default function CommunityDetailScreen() {
   const colors = useAppTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const reduceMotion = useReducedMotion();
   const router = useRouter();
   const { slug } = useLocalSearchParams<{ slug?: string }>();
   const communityQuery = useCommunityDetail(slug ?? '');
@@ -116,7 +133,8 @@ export default function CommunityDetailScreen() {
           </MotionPressable>
         </View>
       ) : community && tone ? (
-        <ScrollView
+        <Animated.ScrollView
+          entering={reduceMotion ? reducedContentEntering : contentEntering}
           contentContainerStyle={styles.content}
           contentInsetAdjustmentBehavior="automatic"
           showsVerticalScrollIndicator={false}
@@ -185,7 +203,7 @@ export default function CommunityDetailScreen() {
               {new Date(expiresAt).toLocaleDateString()}.
             </Text>
           ) : null}
-        </ScrollView>
+        </Animated.ScrollView>
       ) : null}
     </View>
   );

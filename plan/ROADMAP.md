@@ -308,9 +308,9 @@ Must be resolved in the indicated phase; absence of a choice must not block plan
 Discover screens, FastAPI health endpoints, PostgreSQL/Alembic foundation,
 initial users/communities revision, open-community discovery API, centralized
 mobile API URL configuration, a read-only public community preview route with
-native-share support, and a GitHub Actions CI workflow are implemented. The
-preview link is an app deep link, not an invite link or production HTTPS
-universal link.
+native-share support and reduced-motion-aware content entrance, and a GitHub
+Actions CI workflow are implemented. The preview link is an app deep link, not
+an invite link or production HTTPS universal link.
 
 The Home screen still uses fixture data. Discover uses the API and has loading,
 error, empty, search, topic-filter, and pagination states. The API intentionally

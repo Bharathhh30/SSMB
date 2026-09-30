@@ -35,6 +35,9 @@ export const typeScale = {
 export const motion = {
   pressDuration: '120ms',
   pressScale: 0.975,
+  contentEntranceDuration: 250,
+  reducedContentEntranceDuration: 150,
+  contentEntranceOffset: 8,
 } as const;
 
 export const themeBackgrounds = {
