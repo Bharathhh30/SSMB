@@ -25,3 +25,7 @@ async def discover_communities(
         limit=limit,
         offset=offset,
     )
+
+
+async def discoverable_topics(session: AsyncSession) -> list[str]:
+    return await repository.list_public_topics(session)

@@ -27,6 +27,10 @@ type CommunityQuery = {
   signal?: AbortSignal;
 };
 
+export type CommunityTopicList = {
+  items: string[];
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -83,6 +87,23 @@ function parsePage(value: unknown): CommunityPage {
     limit: value.limit as number,
     offset: value.offset as number,
   };
+}
+
+export function parseCommunityTopicList(value: unknown): CommunityTopicList {
+  if (
+    !isRecord(value) ||
+    !Array.isArray(value.items) ||
+    !value.items.every((item) => typeof item === 'string' && item.trim().length > 0)
+  ) {
+    throw new ApiError('The server returned community topics in an unexpected format.', 'response');
+  }
+
+  return { items: value.items as string[] };
+}
+
+export async function fetchCommunityTopics(signal?: AbortSignal): Promise<string[]> {
+  const payload = await getJson('/topics', { signal });
+  return parseCommunityTopicList(payload).items;
 }
 
 export async function fetchCommunities({

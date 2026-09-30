@@ -3,7 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/services/api/api-error';
 import { getJson } from '@/services/api/api-client';
 
-import { fetchCommunities, parseCommunity, type ApiCommunity } from './communities-api';
+import {
+  fetchCommunities,
+  fetchCommunityTopics,
+  parseCommunity,
+  parseCommunityTopicList,
+  type ApiCommunity,
+} from './communities-api';
 
 vi.mock('@/services/api/api-client', () => ({
   getJson: vi.fn(),
@@ -34,6 +40,35 @@ describe('parseCommunity', () => {
     ['missing slug', { slug: undefined }],
   ])('rejects a response with %s', (_description, overrides) => {
     expect(() => parseCommunity({ ...validCommunity, ...overrides })).toThrow(ApiError);
+  });
+});
+
+describe('community topics', () => {
+  beforeEach(() => {
+    getJsonMock.mockReset();
+  });
+
+  it('parses a list of non-empty topic names', () => {
+    expect(parseCommunityTopicList({ items: ['Exam prep', 'Technology'] })).toEqual({
+      items: ['Exam prep', 'Technology'],
+    });
+  });
+
+  it.each([
+    null,
+    { items: 'Technology' },
+    { items: ['Technology', ' '] },
+    { items: ['Technology', null] },
+  ])('rejects malformed topic payloads', (payload) => {
+    expect(() => parseCommunityTopicList(payload)).toThrow(ApiError);
+  });
+
+  it('requests the topics endpoint and forwards cancellation', async () => {
+    const signal = new AbortController().signal;
+    getJsonMock.mockResolvedValue({ items: ['Exam prep', 'Technology'] });
+
+    await expect(fetchCommunityTopics(signal)).resolves.toEqual(['Exam prep', 'Technology']);
+    expect(getJsonMock).toHaveBeenCalledWith('/topics', { signal });
   });
 });
 

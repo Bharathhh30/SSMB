@@ -1,13 +1,11 @@
 import { useCallback, useMemo } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { AppSymbol } from '@/components/app-symbol';
+import { ApiRequestReference } from '@/components/api-request-reference';
 import { MotionPressable } from '@/components/motion-pressable';
-import {
-  communityTopics,
-  type CommunityTopic,
-} from '@/features/communities/data/communities';
+import { useCommunityTopics } from '@/features/communities/hooks/use-community-topics';
 import { layout, radius, spacing, typeScale, useAppTheme } from '@/theme';
 
 const LONG_DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
@@ -22,7 +20,7 @@ const greetingForHour = (hour: number) => {
   return 'Good evening';
 };
 
-const topicDescriptions: Record<CommunityTopic, string> = {
+const topicDescriptions: Record<string, string> = {
   'Exam prep': 'Study toward a test, certification, or personal milestone.',
   Technology: 'Explore tools, code, and technical ideas together.',
   Languages: 'Practice a language through shared goals and conversation.',
@@ -33,16 +31,17 @@ export default function HomeScreen() {
   const colors = useAppTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
+  const topicsQuery = useCommunityTopics();
 
   const openDiscover = useCallback(
-    (topic?: CommunityTopic) => {
+    (topic?: string) => {
       router.push(topic ? { pathname: '/discover', params: { topic } } : '/discover');
     },
     [router],
   );
 
   const renderTopic = useCallback(
-    ({ item }: { item: CommunityTopic }) => (
+    ({ item }: { item: string }) => (
       <MotionPressable
         accessibilityLabel={`Explore ${item} communities`}
         onPress={() => openDiscover(item)}
@@ -56,7 +55,7 @@ export default function HomeScreen() {
         </View>
         <Text style={styles.topicTitle}>{item}</Text>
         <Text numberOfLines={2} style={styles.topicDescription}>
-          {topicDescriptions[item]}
+          {topicDescriptions[item] ?? 'Find people and communities around this shared interest.'}
         </Text>
       </MotionPressable>
     ),
@@ -67,6 +66,39 @@ export default function HomeScreen() {
     () => <View style={styles.topicRowSeparator} />,
     [styles.topicRowSeparator],
   );
+
+  const topicsEmptyState =
+    topicsQuery.status === 'loading' ? (
+      <View style={styles.topicState}>
+        <ActivityIndicator color={colors.accent} />
+        <Text style={styles.topicStateMessage}>Finding topics to explore…</Text>
+      </View>
+    ) : topicsQuery.status === 'error' ? (
+      <View style={styles.topicState}>
+        <Text style={styles.topicStateMessage}>Couldn’t load topics right now.</Text>
+        <ApiRequestReference requestId={topicsQuery.error?.requestId} />
+        <MotionPressable
+          accessibilityLabel="Retry loading topics"
+          onPress={topicsQuery.retry}
+          style={styles.topicRetry}
+        >
+          <Text style={styles.topicRetryText}>Try again</Text>
+        </MotionPressable>
+      </View>
+    ) : (
+      <View style={styles.topicState}>
+        <Text style={styles.topicStateMessage}>
+          No topics have public communities yet. Try browsing all communities.
+        </Text>
+        <MotionPressable
+          accessibilityLabel="Browse all communities"
+          onPress={() => openDiscover()}
+          style={styles.topicRetry}
+        >
+          <Text style={styles.topicRetryText}>Browse all</Text>
+        </MotionPressable>
+      </View>
+    );
 
   const listHeader = useMemo(
     () => (
@@ -159,12 +191,13 @@ export default function HomeScreen() {
     <View style={styles.screen}>
       <FlatList
         ItemSeparatorComponent={topicRowSeparator}
+        ListEmptyComponent={topicsEmptyState}
         ListFooterComponent={listFooter}
         ListHeaderComponent={listHeader}
         columnWrapperStyle={styles.topicRow}
         contentContainerStyle={styles.content}
         contentInsetAdjustmentBehavior="automatic"
-        data={communityTopics}
+        data={topicsQuery.topics}
         keyExtractor={(topic) => topic}
         numColumns={2}
         renderItem={renderTopic}
@@ -373,6 +406,31 @@ function makeStyles(colors: ReturnType<typeof useAppTheme>) {
       color: colors.inkMuted,
       fontSize: typeScale.caption,
       lineHeight: 18,
+    },
+    topicState: {
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xl,
+    },
+    topicStateMessage: {
+      color: colors.inkMuted,
+      fontSize: typeScale.footnote,
+      lineHeight: 20,
+      textAlign: 'center',
+    },
+    topicRetry: {
+      minHeight: 44,
+      justifyContent: 'center',
+      paddingHorizontal: spacing.md,
+      backgroundColor: colors.accentSoft,
+      borderRadius: radius.full,
+      borderCurve: 'continuous',
+    },
+    topicRetryText: {
+      color: colors.accentInk,
+      fontSize: typeScale.footnote,
+      fontWeight: '700',
     },
     sectionHeading: {
       flexDirection: 'row',

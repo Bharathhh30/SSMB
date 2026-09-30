@@ -1,6 +1,5 @@
 import type { ApiCommunity } from '@/features/communities/api/communities-api';
 
-export type CommunityTopic = 'Exam prep' | 'Technology' | 'Languages' | 'Creative';
 export type CommunityTone = 'sage' | 'apricot' | 'lilac' | 'sky' | 'rose';
 
 export type Community = {
@@ -13,13 +12,6 @@ export type Community = {
   tone: CommunityTone;
   monogram: string;
 };
-
-export const communityTopics: CommunityTopic[] = [
-  'Exam prep',
-  'Technology',
-  'Languages',
-  'Creative',
-];
 
 const communityTones: CommunityTone[] = ['sage', 'apricot', 'lilac', 'sky', 'rose'];
 

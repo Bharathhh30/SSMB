@@ -5,6 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.communities.models import Community
 
+PUBLIC_TOPIC_LIMIT = 50
+
 
 async def list_communities(
     session: AsyncSession,
@@ -43,6 +45,23 @@ async def list_communities(
     )
     communities = await session.scalars(statement)
     return list(communities.all()), total or 0
+
+
+async def list_public_topics(session: AsyncSession) -> list[str]:
+    now = datetime.now(UTC)
+    topic = func.trim(Community.topic).label("topic")
+    statement = (
+        select(topic)
+        .where(
+            Community.access_type == "open",
+            or_(Community.expires_at.is_(None), Community.expires_at > now),
+        )
+        .distinct()
+        .order_by(topic.asc())
+        .limit(PUBLIC_TOPIC_LIMIT)
+    )
+    topics = await session.scalars(statement)
+    return list(topics.all())
 
 
 async def get_public_community(session: AsyncSession, *, slug: str) -> Community | None:

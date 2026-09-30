@@ -23,3 +23,7 @@ class CommunityPage(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class CommunityTopicList(BaseModel):
+    items: list[str]

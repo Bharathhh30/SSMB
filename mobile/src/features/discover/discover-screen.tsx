@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -14,21 +14,10 @@ import { AppSymbol } from '@/components/app-symbol';
 import { ApiRequestReference } from '@/components/api-request-reference';
 import { MotionPressable } from '@/components/motion-pressable';
 import { CommunityRow } from '@/features/communities/components/community-row';
-import {
-  communityTopics,
-  toCommunityCard,
-  type Community,
-  type CommunityTopic,
-} from '@/features/communities/data/communities';
+import { toCommunityCard, type Community } from '@/features/communities/data/communities';
+import { useCommunityTopics } from '@/features/communities/hooks/use-community-topics';
 import { useDiscoverCommunities } from '@/features/communities/hooks/use-discover-communities';
 import { layout, radius, spacing, typeScale, useAppTheme } from '@/theme';
-
-const allTopics = ['All', ...communityTopics] as const;
-type TopicFilter = (typeof allTopics)[number];
-
-function isCommunityTopic(value: unknown): value is CommunityTopic {
-  return typeof value === 'string' && communityTopics.some((topic) => topic === value);
-}
 
 export default function DiscoverScreen() {
   const colors = useAppTheme();
@@ -36,9 +25,10 @@ export default function DiscoverScreen() {
   const { topic: initialTopic } = useLocalSearchParams<{ topic?: string }>();
   const router = useRouter();
   const [query, setQuery] = useState('');
-  const [selectedTopic, setSelectedTopic] = useState<TopicFilter>(
-    isCommunityTopic(initialTopic) ? initialTopic : 'All',
-  );
+  const [selectedTopic, setSelectedTopic] = useState('All');
+  const appliedRouteTopic = useRef<string | undefined>(undefined);
+  const topicQuery = useCommunityTopics();
+  const topicFilters = useMemo(() => ['All', ...topicQuery.topics], [topicQuery.topics]);
   const communityQuery = useDiscoverCommunities(
     query,
     selectedTopic === 'All' ? undefined : selectedTopic,
@@ -66,10 +56,23 @@ export default function DiscoverScreen() {
   );
 
   useEffect(() => {
-    if (isCommunityTopic(initialTopic)) {
-      setSelectedTopic(initialTopic);
+    if (topicQuery.status !== 'success') {
+      return;
     }
-  }, [initialTopic]);
+
+    setSelectedTopic((current) =>
+      current !== 'All' && !topicQuery.topics.includes(current) ? 'All' : current,
+    );
+    if (appliedRouteTopic.current === initialTopic) {
+      return;
+    }
+    appliedRouteTopic.current = initialTopic;
+    setSelectedTopic(
+      typeof initialTopic === 'string' && topicQuery.topics.includes(initialTopic)
+        ? initialTopic
+        : 'All',
+    );
+  }, [initialTopic, topicQuery.status, topicQuery.topics]);
 
   const clearFilters = () => {
     setQuery('');
@@ -119,7 +122,7 @@ export default function DiscoverScreen() {
           keyboardShouldPersistTaps="handled"
           showsHorizontalScrollIndicator={false}
         >
-          {allTopics.map((topic) => {
+          {topicFilters.map((topic) => {
             const selected = topic === selectedTopic;
 
             return (
@@ -140,6 +143,26 @@ export default function DiscoverScreen() {
             );
           })}
         </ScrollView>
+
+        {topicQuery.status === 'loading' ? (
+          <Text accessibilityRole="text" style={styles.topicNotice}>
+            Loading topics…
+          </Text>
+        ) : topicQuery.status === 'error' ? (
+          <View style={styles.topicError}>
+            <View style={styles.topicErrorCopy}>
+              <Text style={styles.topicNotice}>Couldn’t load topic filters.</Text>
+              <ApiRequestReference requestId={topicQuery.error?.requestId} />
+            </View>
+            <MotionPressable
+              accessibilityLabel="Retry loading topics"
+              onPress={topicQuery.retry}
+              style={styles.topicRetry}
+            >
+              <Text style={styles.topicRetryText}>Retry</Text>
+            </MotionPressable>
+          </View>
+        ) : null}
 
         <View style={styles.resultsHeading}>
           <View>
@@ -162,7 +185,18 @@ export default function DiscoverScreen() {
         </View>
       </View>
     ),
-    [colors, communityQuery.status, communityQuery.total, query, selectedTopic, styles],
+    [
+      colors,
+      communityQuery.status,
+      communityQuery.total,
+      query,
+      selectedTopic,
+      styles,
+      topicFilters,
+      topicQuery.error?.requestId,
+      topicQuery.retry,
+      topicQuery.status,
+    ],
   );
 
   const hasFilters = query.trim().length > 0 || selectedTopic !== 'All';
@@ -331,6 +365,33 @@ function makeStyles(colors: ReturnType<typeof useAppTheme>) {
       alignItems: 'center',
       gap: spacing.xs,
       paddingRight: spacing.md,
+    },
+    topicError: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+    },
+    topicErrorCopy: {
+      flex: 1,
+      gap: spacing.xxs,
+    },
+    topicNotice: {
+      color: colors.inkMuted,
+      fontSize: typeScale.caption,
+    },
+    topicRetry: {
+      minHeight: 40,
+      justifyContent: 'center',
+      paddingHorizontal: spacing.md,
+      backgroundColor: colors.accentSoft,
+      borderRadius: radius.full,
+      borderCurve: 'continuous',
+    },
+    topicRetryText: {
+      color: colors.accentInk,
+      fontSize: typeScale.caption,
+      fontWeight: '700',
     },
     topicChip: {
       minHeight: 42,
