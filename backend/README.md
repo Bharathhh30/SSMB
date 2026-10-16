@@ -15,7 +15,7 @@ uv sync --locked
 docker compose up -d db
 uv run --locked alembic upgrade head
 uv run --locked python -m app.scripts.seed_development
-uv run uvicorn app.main:app --reload --no-access-log
+uv run uvicorn app.main:app --reload --host 127.0.0.1 --no-access-log
 ```
 
 The API liveness endpoint is `http://127.0.0.1:8000/api/v1/health`; database
@@ -29,6 +29,11 @@ credentials and must never be reused for staging or production.
 The explicit seed command creates five repeatable demo communities and one demo
 owner. It refuses to run unless `APP_ENV=development`; no seed data is inserted
 automatically when the API starts.
+
+For a physical-device Expo Go prototype on the same trusted Wi-Fi, start the API
+with `--host 0.0.0.0` instead and set the mobile API URL to the computer's LAN
+address (for example, `http://192.168.1.20:8000/api/v1`). Keep PostgreSQL bound
+to loopback; do not expose or tunnel its port.
 
 ## Container image
 

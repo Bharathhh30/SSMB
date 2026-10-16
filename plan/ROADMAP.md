@@ -38,9 +38,9 @@ These personas are planning assumptions based on the concept document; validate 
 | Database | PostgreSQL |
 | Schema changes | Alembic migrations only |
 | Architecture | Modular monolith; feature-oriented backend modules |
-| Source control / CI | GitHub-style pull requests and GitHub Actions baseline, provider confirmation in Phase 0 |
-| Mobile delivery | EAS development/preview/production build profiles; store release process chosen before beta |
-| Hosting | Provider-neutral until Phase 0 provider/region/cost review |
+| Source control / CI | Existing GitHub Actions workflow is optional regression coverage during local prototyping; required branch gates follow prototype approval |
+| Mobile delivery | Expo Go for the local prototype; EAS builds and store release after the final draft |
+| Hosting | Local FastAPI + PostgreSQL via Docker Compose now; choose hosted API/database after prototype signoff |
 
 Do not introduce an ORM, authentication vendor, object-storage vendor, push provider, voice vendor, or hosting provider as a settled choice until it is recorded in a short decision note. The implementation proposal is SQLAlchemy 2.x with Alembic, Pydantic settings, a managed PostgreSQL service, private object storage, and a managed real-time voice service; validate fit and current pricing before adoption.
 
@@ -186,6 +186,11 @@ This is the intended structure, not a request to create all application director
 
 ## 7. URL and environment workflow
 
+During the prototype, use only the local API URL in
+`mobile/.env.development.local`. Do not create public domains or EAS
+environments yet. The environment matrix below is a later delivery target, not
+a Phase 1 prerequisite.
+
 ### Quick local/tunnel setup
 
 1. Copy `mobile/.env.example` to `mobile/.env.development.local` (ignored by Git).
@@ -209,6 +214,10 @@ The initial app is mobile, so it does not have a static frontend website URL. If
 
 ## 8. Git and release strategy
 
+The branch rules below describe the eventual release model. During prototype
+review, short-lived feature commits and local checks are sufficient; protected
+branch gates and automatic deployments are deferred.
+
 Use the requested environment branches while keeping feature work short-lived:
 
 - `develop`: integration branch; successful merge deploys to the development environment.
@@ -222,6 +231,11 @@ Protect environment branches, disallow direct pushes, require green CI and revie
 Commit format: `type(scope): imperative summary`, e.g. `feat(events): add session reminders`, `fix(api): enforce community membership`, `docs(plan): define release gates`. Use `feat`, `fix`, `docs`, `refactor`, `test`, `build`, `ci`, and `chore` consistently.
 
 ## 9. CI/CD and deployment model
+
+This is the post-prototype target. Keep the existing checks available, but
+defer required status rules, EAS delivery, cloud deployment jobs, secrets, and
+automatic promotions until the owner approves the final prototype and selects
+a host.
 
 ### Pull-request CI
 
@@ -272,7 +286,7 @@ Detailed tasks, outputs, and acceptance checks are in the linked files.
 | Phase | Scope | Exit gate |
 |---|---|---|
 | 0 — Product decisions & design contracts | Validate personas, MVP sequence, permissions, privacy/moderation policy, providers, UX/API contracts, risk decisions | Approved scope, key architecture decisions, interface map, acceptance criteria |
-| 1 — Engineering foundation | Monorepo, Expo scaffold, FastAPI skeleton, PostgreSQL/Alembic, configuration, local workflow, branch protections, CI/CD skeleton | Reproducible local setup, green CI, dev deployment, health check, first tested migration |
+| 1 — Local prototype foundation | Expo Go app, local FastAPI/PostgreSQL, Alembic, local URL config, discovery and preview UI | Fresh local setup, migrated/seeded API, app-to-API smoke on iOS/Android, prototype feedback |
 | 2 — Identity & onboarding | Auth, profile, sessions, account/security settings, consent/legal entry points | Secure critical identity journeys and authorization tests |
 | 3 — Communities & discovery | Create/manage/search/join/leave, access rules, invites, membership roles | End-to-end discover-to-join and owner/moderator permissions |
 | 4 — Content, materials & files | Posts, links, PDFs/documents, private storage, saved items, report entry points | Secure sharing and upload/download flows with limits and auditability |
@@ -281,7 +295,7 @@ Detailed tasks, outputs, and acceptance checks are in the linked files.
 | 7 — Moderation & trust/safety | Reports, queues, audit, escalation, actions/appeals, operator tools | Human-review process, abuse resistance, permission/audit tests |
 | 8 — Voice rooms | Provider integration, lobby, participation/host controls, failure/rejoin, safety and cost controls | Cross-platform audio QA, permission/safety policy, capacity and cost review |
 | 9 — Streaks & engagement | Activity ledger, streaks, reminders, privacy/quiet hours, engagement metrics | User-controlled engagement with correct timezone and privacy semantics |
-| 10 — Production readiness & launch | Hardening, store release, load/security/accessibility testing, runbooks, staged rollout | Go/no-go checklist signed, restore/rollback rehearsed, monitoring/support in place |
+| 10 — Final identity, production readiness & launch | Confirm brand/domain/app IDs and provider/region/budget; EAS signing, hosted API/database, CI/CD protections, hardening, store release, runbooks, staged rollout | Go/no-go checklist signed, restore/rollback rehearsed, monitoring/support in place |
 
 ## 13. Open decisions register
 
@@ -289,10 +303,11 @@ Must be resolved in the indicated phase; absence of a choice must not block plan
 
 | Decision | Proposed evaluation / default | Due |
 |---|---|---|
-| Product name, audience, age floor, initial locale | Validate whether study communities are the launch beachhead; legal/privacy review for age and region | 0 |
+| Product name, brand, public domain, and native app IDs | Decide after the prototype is approved; use an owned namespace for permanent store identifiers | 10 |
+| Audience, age floor, initial locale | Validate launch audience and legal/privacy requirements before identity and public launch | 0/2 |
 | Expo Router and state/data libraries | Prefer Expo Router; choose state, query/cache, and forms libraries based on supported versions and team comfort | 0 |
 | Auth method | Compare email/password, email links, phone, and social sign-in; define verification and recovery | 0 |
-| Cloud provider, region, deployment target, budget | Compare managed container hosting, managed PostgreSQL, storage, backups, data residency, and egress cost | 0 |
+| Cloud provider, region, deployment target, budget | Compare managed container hosting, managed PostgreSQL, storage, backups, data residency, and egress cost after prototype signoff | 10 |
 | ORM and DB access | Validate SQLAlchemy async/sync approach, pooling, transaction boundaries, and migration tooling | 0 |
 | Email, push, object storage | Pick providers and define adapters, deliverability, costs, residency, and failure policy | 0/4/5 |
 | Real-time messaging | Compare managed realtime vs FastAPI WebSockets; document ordering, presence, offline, reconnect, scaling | 5 |
@@ -304,7 +319,7 @@ Must be resolved in the indicated phase; absence of a choice must not block plan
 
 ## 14. Current implementation checkpoint
 
-**As of 2026-09-30:** Phase 1 remains in progress. The Expo shell, themed Home and
+Phase 1 is now explicitly local-prototype work. The Expo shell, themed Home and
 Discover screens, FastAPI health endpoints, PostgreSQL/Alembic foundation,
 initial users/communities revision, open-community discovery API, centralized
 mobile API URL configuration, a read-only public community preview route with
@@ -335,19 +350,19 @@ typecheck, and web/iOS/Android exports, but failed at `npm audit` on the two
 documented upstream high advisories. The initial Alembic migration and
 readiness endpoint were also verified against an isolated, temporary
 PostgreSQL 18 cluster; the developer's existing PostgreSQL service was not
-modified. Phase 1 exit criteria remain open until the mobile audit is clean or
-the owner records an explicit time-bounded disposition, EAS is linked and
-signed internal clients are tested, required branch protections and API
-deployments are configured, and the app-to-API tunnel flow is smoke-tested on a
-physical device.
+modified. The hosted CI workflow is retained as optional regression coverage;
+its audit failure is not a blocker to opening the local prototype, but must be
+resolved before making remote CI a required release gate.
 
-The mobile project now includes the SDK-compatible `expo-dev-client` package
-and development/preview/production EAS build profiles. EAS linking, permanent
-native application IDs, signing, and environment URLs intentionally await the
-owner's account/provider setup. Remote `develop` and `staging` branches have
-been bootstrapped from `main`; the pushed feature branch enables push CI for
-short-lived `feature/*`, `fix/*`, and `hotfix/*` branches. Required GitHub
-branch rules still need repository-admin access.
+The mobile URL template now defaults to a local FastAPI address, and the Expo Go
+instructions cover iOS Simulator, Android Emulator, and physical devices on a
+trusted Wi-Fi network. EAS profiles, custom development-client builds, package
+IDs, brand/domain decisions, hosted API environments, branch protections, and
+production deployment are intentionally deferred until the user approves the
+prototype. Remote `develop` and `staging` branch names exist as scaffolding;
+feature pushes do not trigger hosted CI during prototype iteration. The app
+has not yet been smoke-tested on the user's own device; that local review and
+feedback is the current Phase 1 gate.
 
 The SQLAlchemy async/asyncpg choice is provisional and recorded in
 `../docs/decisions/0001-async-sqlalchemy.md`; revisit it at the Phase 0

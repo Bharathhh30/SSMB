@@ -1,23 +1,27 @@
-# Phase 1 — Engineering foundation and delivery pipeline
+# Phase 1 — Local prototype foundation
 
-**Status:** In progress
-**Goal:** Establish a reproducible Expo/FastAPI/PostgreSQL codebase, safe environments, migration workflow, and CI/CD before feature work.
+**Status:** In progress — local-first; production delivery is deferred until the prototype is approved.
+**Goal:** Make the Expo app and FastAPI/PostgreSQL backend easy to run locally so the user can inspect the experience and guide iterative improvements.
 
 ## Work
 
-- Create the agreed monorepo structure; initialize Expo + TypeScript and FastAPI with locked dependencies.
-- Add environment validation, `.env.example` files, ignore rules, typed mobile URL configuration, and safe logging defaults.
-- Add PostgreSQL local development, migrations with Alembic, health/readiness endpoints, structured logs, and baseline metrics.
-- Establish `develop`, `staging`, and protected `main` promotion branches plus short-lived feature/fix/hotfix branches and PR templates.
-- Build PR workflows for formatting, lint, type checks, unit/integration tests, Expo diagnostics/build validation, migration validation, dependency/security scans.
-- Create isolated development/staging/production configuration and deploy targets; initially deploy a backend health endpoint.
-- Set up EAS project/build profiles and an internal development build early enough to validate real project behavior; Expo Go may be used for quick initial smoke tests but is not the production validation target. Keep provider credentials in managed secrets.
-- Document local commands, tunnel-sharing steps, troubleshooting, release process, and rollback constraints.
+- Keep the Expo/TypeScript app runnable in Expo Go on iOS and Android without a cloud project or store identifiers.
+- Document local PostgreSQL startup, Alembic migration, deterministic development seed, FastAPI readiness, and the mobile API URL for simulator, emulator, or a phone on the same Wi-Fi.
+- Iterate on the local discover → public preview flow, with loading, empty, error, retry, and accessibility behavior.
+- Keep formatting, type, unit, backend integration, and Expo export checks easy to run locally. The existing GitHub Actions workflow remains a useful optional regression check.
+
+## Deferred until the prototype is approved
+
+- Product brand, public domain, permanent iOS bundle ID, and Android application ID.
+- EAS project linking, custom development clients, signing credentials, store accounts, and releases.
+- Hosted API/PostgreSQL, deployment regions, paid cloud resources, remote tunnels for friends, and production environments.
+- Required branch protections and automatic deployments. Existing branches/workflows are scaffolding only during local prototyping.
 
 ## Deliverables
 
-- Working app shell on iOS and Android, backend skeleton, PostgreSQL service, first Alembic revision, CI workflows, environment matrix, local setup guide.
-- Developer can change the backend tunnel URL in `mobile/.env.development.local` without editing screens or source constants.
+- Reproducible local Expo/FastAPI/PostgreSQL setup with a tested migration and seeded prototype communities.
+- Developer can change a local API URL in `mobile/.env.development.local` without editing screens or source constants.
+- User can open the prototype in Expo Go and review Discover and a public community preview before any deployment decisions.
 
 ## Progress checkpoint
 
@@ -32,19 +36,14 @@
 - [x] Surface validated server request IDs as selectable references in mobile API error states.
 - [x] Add a non-root API container image and CI build/readiness smoke-test definition.
 - [x] Add request IDs and redacted structured HTTP logs with a generic unexpected-error response.
-- [x] Install the SDK-compatible Expo development client and define development, preview/staging, and production EAS build profiles.
 - [x] Apply the initial migration and run the backend suite against an isolated temporary local PostgreSQL cluster; verify `/api/v1/health/ready` against that migrated database.
-- [x] Bootstrap remote `develop` and `staging` from the initial `main` baseline, publish the feature branch, and enable push CI for feature/fix/hotfix branches.
-- [ ] Clear or obtain an explicit, time-bounded risk disposition for the two high-severity upstream mobile dependency advisories documented in `docs/security/MOBILE-NPM-AUDIT-2026-10-16.md`; do not suppress the audit.
-- [ ] Link EAS to the owner's project, choose permanent iOS/Android application IDs, provision EAS environments/signing, and build/install internal iOS and Android development clients.
-- [x] Run GitHub Actions end-to-end: the backend/PostgreSQL job passed migration, integration tests, and container readiness; the mobile job passed tests, typecheck, and exports.
-- [ ] Get a green required GitHub Actions run; the current mobile run fails only at the fail-closed npm audit step until the two findings are resolved or dispositioned.
-- [ ] Configure required branch protections and environment-specific API deployment targets/secrets; hosting provider, region, and budget remain undecided.
-- [ ] Smoke-test a physical-device app-to-API connection using a current backend tunnel URL.
+- [x] Make the local API URL template point to the backend on the same machine by default and document Android-emulator/physical-device overrides.
+- [ ] Run the documented two-terminal local startup on the user's computer and open the app in Expo Go on a target iOS/Android device.
+- [ ] Review the local discovery and community-preview experience with the user and iterate from their feedback.
+- [ ] Before remote CI becomes a required gate, resolve the two unpatched mobile audit findings or record an owner-approved, time-bounded disposition; see `docs/security/MOBILE-NPM-AUDIT-2026-10-16.md`.
 
 ## Exit criteria
 
-- Clean checkout can be set up from documented steps; no credentials are needed in tracked files.
-- CI is required on PRs and exercises both app and API.
-- A tested migration can run locally and in development as a single controlled step.
-- Expo development server and FastAPI are independently reachable for remote testing; staging and production are isolated.
+- Clean checkout can start PostgreSQL, apply the migration, seed demo data, and start FastAPI using documented local commands.
+- Expo Go can reach the local API on a simulator/emulator or a phone on the same trusted network.
+- The user has inspected the local app and the first prototype iteration is accepted before cloud/domain/store decisions begin.

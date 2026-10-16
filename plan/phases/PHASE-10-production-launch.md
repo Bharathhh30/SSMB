@@ -5,6 +5,8 @@
 
 ## Work
 
+- After the prototype is approved, finalize product brand/domain, permanent iOS/Android identifiers, hosting provider/region/budget, and data-residency requirements.
+- Configure EAS project/signing/store accounts, hosted API and PostgreSQL environments, required branch protections, secrets, deployment pipelines, and remote-test URLs.
 - Complete dependency/security review, threat model refresh, privacy/accessibility review, load/soak tests, and mobile device matrix.
 - Validate production networking, rate limits, secrets/IAM, logs/metrics/traces/alerts, data retention, support and incident response.
 - Run database backup restore and deployment/rollback drills; test migration compatibility and forward-fix recovery.
