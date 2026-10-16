@@ -328,22 +328,26 @@ preview; join/create, membership, and role actions remain out of scope until
 identity and access decisions are complete. The development seed command is
 explicit and refuses to run outside `APP_ENV=development`.
 
-The CI workflow and PostgreSQL integration test have been authored but have not
-yet run on GitHub. The initial Alembic migration and readiness endpoint were
-verified against an isolated, temporary PostgreSQL 18 cluster; the developer's
-existing PostgreSQL service was not modified. Phase 1 exit criteria remain open
-until a GitHub Actions run is green, the mobile audit's two currently unpatched
-Expo CLI transitive advisories are resolved or explicitly dispositioned,
-EAS is linked and signed internal clients are tested, environment/branch
-protections and API deployments are configured, and the app-to-API tunnel flow
-is smoke-tested on a physical device.
+The first GitHub Actions run is complete. Its backend/PostgreSQL job passed the
+Alembic migration, repository integration tests, and Docker image readiness
+smoke test. The mobile job passed installation, Expo compatibility, unit tests,
+typecheck, and web/iOS/Android exports, but failed at `npm audit` on the two
+documented upstream high advisories. The initial Alembic migration and
+readiness endpoint were also verified against an isolated, temporary
+PostgreSQL 18 cluster; the developer's existing PostgreSQL service was not
+modified. Phase 1 exit criteria remain open until the mobile audit is clean or
+the owner records an explicit time-bounded disposition, EAS is linked and
+signed internal clients are tested, required branch protections and API
+deployments are configured, and the app-to-API tunnel flow is smoke-tested on a
+physical device.
 
 The mobile project now includes the SDK-compatible `expo-dev-client` package
 and development/preview/production EAS build profiles. EAS linking, permanent
 native application IDs, signing, and environment URLs intentionally await the
-owner's account/provider setup. Push CI triggers include short-lived
-`feature/*`, `fix/*`, and `hotfix/*` branches; required GitHub branch rules still
-need repository-admin access.
+owner's account/provider setup. Remote `develop` and `staging` branches have
+been bootstrapped from `main`; the pushed feature branch enables push CI for
+short-lived `feature/*`, `fix/*`, and `hotfix/*` branches. Required GitHub
+branch rules still need repository-admin access.
 
 The SQLAlchemy async/asyncpg choice is provisional and recorded in
 `../docs/decisions/0001-async-sqlalchemy.md`; revisit it at the Phase 0

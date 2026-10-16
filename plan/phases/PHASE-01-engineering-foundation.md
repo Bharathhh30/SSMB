@@ -34,10 +34,11 @@
 - [x] Add request IDs and redacted structured HTTP logs with a generic unexpected-error response.
 - [x] Install the SDK-compatible Expo development client and define development, preview/staging, and production EAS build profiles.
 - [x] Apply the initial migration and run the backend suite against an isolated temporary local PostgreSQL cluster; verify `/api/v1/health/ready` against that migrated database.
+- [x] Bootstrap remote `develop` and `staging` from the initial `main` baseline, publish the feature branch, and enable push CI for feature/fix/hotfix branches.
 - [ ] Clear or obtain an explicit, time-bounded risk disposition for the two high-severity upstream mobile dependency advisories documented in `docs/security/MOBILE-NPM-AUDIT-2026-10-16.md`; do not suppress the audit.
 - [ ] Link EAS to the owner's project, choose permanent iOS/Android application IDs, provision EAS environments/signing, and build/install internal iOS and Android development clients.
-- [ ] Confirm the first GitHub Actions run passes, including the PostgreSQL repository integration test.
-- [ ] Resolve the two unpatched high mobile dependency advisories or record an owner-approved, time-bounded disposition; see `docs/security/MOBILE-NPM-AUDIT-2026-10-16.md`. The audit remains fail-closed.
+- [x] Run GitHub Actions end-to-end: the backend/PostgreSQL job passed migration, integration tests, and container readiness; the mobile job passed tests, typecheck, and exports.
+- [ ] Get a green required GitHub Actions run; the current mobile run fails only at the fail-closed npm audit step until the two findings are resolved or dispositioned.
 - [ ] Configure required branch protections and environment-specific API deployment targets/secrets; hosting provider, region, and budget remain undecided.
 - [ ] Smoke-test a physical-device app-to-API connection using a current backend tunnel URL.
 
