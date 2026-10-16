@@ -108,7 +108,16 @@ export default function HomeScreen() {
             <View style={styles.eyebrowDot} />
             <Text style={styles.eyebrow}>LEARN, MAKE, GROW TOGETHER</Text>
           </View>
-          <Text style={styles.date}>{LONG_DATE_FORMATTER.format(new Date())}</Text>
+          <View style={styles.dateRow}>
+            <Text style={styles.date}>{LONG_DATE_FORMATTER.format(new Date())}</Text>
+            <MotionPressable
+              accessibilityLabel="Open account options"
+              onPress={() => router.push('/account/index')}
+              style={styles.accountAction}
+            >
+              <Text style={styles.accountActionText}>Get started</Text>
+            </MotionPressable>
+          </View>
           <Text accessibilityRole="header" style={styles.headline}>
             {greetingForHour(new Date().getHours())},{'\n'}let’s grow together.
           </Text>
@@ -165,7 +174,7 @@ export default function HomeScreen() {
         </View>
       </View>
     ),
-    [colors, openDiscover, styles],
+    [colors, openDiscover, router, styles],
   );
 
   const listFooter = useMemo(
@@ -251,7 +260,26 @@ function makeStyles(colors: ReturnType<typeof useAppTheme>) {
     date: {
       color: colors.inkSubtle,
       fontSize: typeScale.footnote,
-      marginBottom: spacing.xxs,
+    },
+    dateRow: {
+      minHeight: 44,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+    },
+    accountAction: {
+      minHeight: 44,
+      justifyContent: 'center',
+      paddingHorizontal: spacing.md,
+      backgroundColor: colors.accentSoft,
+      borderRadius: radius.full,
+      borderCurve: 'continuous',
+    },
+    accountActionText: {
+      color: colors.accentInk,
+      fontSize: typeScale.footnote,
+      fontWeight: '700',
     },
     headline: {
       color: colors.ink,

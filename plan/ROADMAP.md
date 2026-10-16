@@ -369,3 +369,11 @@ The SQLAlchemy async/asyncpg choice is provisional and recorded in
 `../docs/decisions/0001-async-sqlalchemy.md`; revisit it at the Phase 0
 architecture decision gate before production. Hosting, authentication, and
 other product/provider decisions remain unresolved as listed above.
+
+Phase 2 has begun with a local-only identity UI exploration: Home now links to
+welcome, sign-up, and sign-in screens, with guest browsing preserved. The forms
+only validate draft input in memory and explicitly do not transmit or save it;
+they do not create accounts or sessions. Email/password is a provisional screen
+prototype, not a chosen authentication method. Authentication, recovery,
+verification, age/audience, and profile persistence remain gated on the Phase 0
+decisions and owner review. See `phases/PHASE-02-identity-onboarding.md`.
