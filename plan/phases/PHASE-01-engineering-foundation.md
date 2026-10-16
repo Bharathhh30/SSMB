@@ -38,8 +38,9 @@
 - [x] Add request IDs and redacted structured HTTP logs with a generic unexpected-error response.
 - [x] Apply the initial migration and run the backend suite against an isolated temporary local PostgreSQL cluster; verify `/api/v1/health/ready` against that migrated database.
 - [x] Make the local API URL template point to the backend on the same machine by default and document Android-emulator/physical-device overrides.
-- [ ] Run the documented two-terminal local startup on the user's computer and open the app in Expo Go on a target iOS/Android device.
-- [ ] Review the local discovery and community-preview experience with the user and iterate from their feedback.
+- [x] User reports inspecting the prototype UI in Android Studio.
+- [ ] Confirm API-backed discovery/preview works in the Android Studio emulator and record the user's UI feedback for the next iteration.
+- [ ] Validate the local flow on iOS when a Mac simulator or physical iPhone is available.
 - [ ] Before remote CI becomes a required gate, resolve the two unpatched mobile audit findings or record an owner-approved, time-bounded disposition; see `docs/security/MOBILE-NPM-AUDIT-2026-10-16.md`.
 
 ## Exit criteria

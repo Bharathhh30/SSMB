@@ -360,9 +360,10 @@ trusted Wi-Fi network. EAS profiles, custom development-client builds, package
 IDs, brand/domain decisions, hosted API environments, branch protections, and
 production deployment are intentionally deferred until the user approves the
 prototype. Remote `develop` and `staging` branch names exist as scaffolding;
-feature pushes do not trigger hosted CI during prototype iteration. The app
-has not yet been smoke-tested on the user's own device; that local review and
-feedback is the current Phase 1 gate.
+feature pushes do not trigger hosted CI during prototype iteration. The user
+reports inspecting the UI in Android Studio. We still need to confirm the
+API-backed discovery/preview flow there and capture feedback; Expo Go access
+from this Windows host is blocked by its group-policy-managed inbound firewall.
 
 The SQLAlchemy async/asyncpg choice is provisional and recorded in
 `../docs/decisions/0001-async-sqlalchemy.md`; revisit it at the Phase 0
