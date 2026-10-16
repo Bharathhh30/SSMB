@@ -1,7 +1,7 @@
 # Community Platform — Cumulative Product and Engineering Roadmap
 
 **Status:** Implementation in progress
-**Last updated:** 2026-09-30
+**Last updated:** 2026-10-16
 **Product source:** `../Community_Platform_Concept.md`
 **Repository guidance:** `../AGENTS.md`
 
@@ -329,11 +329,21 @@ identity and access decisions are complete. The development seed command is
 explicit and refuses to run outside `APP_ENV=development`.
 
 The CI workflow and PostgreSQL integration test have been authored but have not
-yet run on GitHub. The migration was rendered to PostgreSQL offline SQL, but
-has not been applied to the developer's database. Phase 1 exit criteria remain
-open until CI is green, the migration and readiness path pass against live
-PostgreSQL, environment/branch protections and deployments are configured, and
-the app-to-API tunnel flow is smoke-tested on a device.
+yet run on GitHub. The initial Alembic migration and readiness endpoint were
+verified against an isolated, temporary PostgreSQL 18 cluster; the developer's
+existing PostgreSQL service was not modified. Phase 1 exit criteria remain open
+until a GitHub Actions run is green, the mobile audit's two currently unpatched
+Expo CLI transitive advisories are resolved or explicitly dispositioned,
+EAS is linked and signed internal clients are tested, environment/branch
+protections and API deployments are configured, and the app-to-API tunnel flow
+is smoke-tested on a physical device.
+
+The mobile project now includes the SDK-compatible `expo-dev-client` package
+and development/preview/production EAS build profiles. EAS linking, permanent
+native application IDs, signing, and environment URLs intentionally await the
+owner's account/provider setup. Push CI triggers include short-lived
+`feature/*`, `fix/*`, and `hotfix/*` branches; required GitHub branch rules still
+need repository-admin access.
 
 The SQLAlchemy async/asyncpg choice is provisional and recorded in
 `../docs/decisions/0001-async-sqlalchemy.md`; revisit it at the Phase 0

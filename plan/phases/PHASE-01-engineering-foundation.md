@@ -23,7 +23,7 @@
 
 - [x] Expo Router tabs scaffold created with TypeScript and the current SDK-compatible Reanimated/worklets dependencies.
 - [x] Dependencies locked; transitive overrides applied for the scaffold audit advisories.
-- [x] TypeScript, Expo dependency alignment, Expo Doctor, dependency audit, and web static export pass.
+- [x] Clean `npm ci`, Expo SDK compatibility check, Expo Doctor, TypeScript, mobile unit tests, and web/iOS/Android JavaScript exports pass.
 - [x] Replace template screens with a themed, guest-safe Home and API-backed Discover flow.
 - [x] Remove fixture membership claims and provide topic shortcuts until identity/membership exists.
 - [x] Add the FastAPI health/discovery API, PostgreSQL configuration, initial users/communities schema, Alembic revision, and explicit development seed.
@@ -32,9 +32,13 @@
 - [x] Surface validated server request IDs as selectable references in mobile API error states.
 - [x] Add a non-root API container image and CI build/readiness smoke-test definition.
 - [x] Add request IDs and redacted structured HTTP logs with a generic unexpected-error response.
-- [ ] Run the migration and readiness endpoint against the developer's live local PostgreSQL service.
+- [x] Install the SDK-compatible Expo development client and define development, preview/staging, and production EAS build profiles.
+- [x] Apply the initial migration and run the backend suite against an isolated temporary local PostgreSQL cluster; verify `/api/v1/health/ready` against that migrated database.
+- [ ] Clear or obtain an explicit, time-bounded risk disposition for the two high-severity upstream mobile dependency advisories documented in `docs/security/MOBILE-NPM-AUDIT-2026-10-16.md`; do not suppress the audit.
+- [ ] Link EAS to the owner's project, choose permanent iOS/Android application IDs, provision EAS environments/signing, and build/install internal iOS and Android development clients.
 - [ ] Confirm the first GitHub Actions run passes, including the PostgreSQL repository integration test.
-- [ ] Configure required branch protections, environment-specific deployment targets/secrets, and EAS build profiles.
+- [ ] Resolve the two unpatched high mobile dependency advisories or record an owner-approved, time-bounded disposition; see `docs/security/MOBILE-NPM-AUDIT-2026-10-16.md`. The audit remains fail-closed.
+- [ ] Configure required branch protections and environment-specific API deployment targets/secrets; hosting provider, region, and budget remain undecided.
 - [ ] Smoke-test a physical-device app-to-API connection using a current backend tunnel URL.
 
 ## Exit criteria
