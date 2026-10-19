@@ -112,7 +112,7 @@ export default function HomeScreen() {
             <Text style={styles.date}>{LONG_DATE_FORMATTER.format(new Date())}</Text>
             <MotionPressable
               accessibilityLabel="Open account options"
-              onPress={() => router.push('/account/index')}
+              onPress={() => router.push('/account')}
               style={styles.accountAction}
             >
               <Text style={styles.accountActionText}>Get started</Text>

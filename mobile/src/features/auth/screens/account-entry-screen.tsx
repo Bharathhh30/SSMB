@@ -60,6 +60,15 @@ export function AccountEntryScreen() {
       </View>
 
       <MotionPressable
+        accessibilityLabel="Preview profile setup"
+        onPress={() => router.push('/account/profile')}
+        style={styles.profilePreviewAction}
+      >
+        <Text style={styles.profilePreviewActionText}>Explore profile setup</Text>
+        <AppSymbol color={colors.accent} name="arrowRight" size={16} />
+      </MotionPressable>
+
+      <MotionPressable
         accessibilityLabel="Continue browsing as a guest"
         onPress={() => router.replace('/')}
         style={styles.guestAction}
@@ -165,6 +174,19 @@ function makeStyles(colors: ReturnType<typeof useAppTheme>) {
       color: colors.inkMuted,
       fontSize: typeScale.caption,
       lineHeight: 18,
+    },
+    profilePreviewAction: {
+      minHeight: 44,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.xs,
+      paddingHorizontal: spacing.md,
+    },
+    profilePreviewActionText: {
+      color: colors.accent,
+      fontSize: typeScale.footnote,
+      fontWeight: '700',
     },
     guestAction: {
       minHeight: 44,

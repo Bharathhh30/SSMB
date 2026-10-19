@@ -6,6 +6,7 @@ const symbols = {
   search: { ios: 'magnifyingglass', android: 'search', web: 'search' },
   arrowRight: { ios: 'arrow.right', android: 'arrow_forward', web: 'arrow_forward' },
   close: { ios: 'xmark', android: 'close', web: 'close' },
+  check: { ios: 'checkmark', android: 'check', web: 'check' },
   people: { ios: 'person.2.fill', android: 'group', web: 'group' },
   sparkle: { ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' },
   share: {

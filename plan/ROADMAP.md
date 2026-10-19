@@ -376,4 +376,7 @@ only validate draft input in memory and explicitly do not transmit or save it;
 they do not create accounts or sessions. Email/password is a provisional screen
 prototype, not a chosen authentication method. Authentication, recovery,
 verification, age/audience, and profile persistence remain gated on the Phase 0
-decisions and owner review. See `phases/PHASE-02-identity-onboarding.md`.
+decisions and owner review. A profile setup/preview screen now demonstrates a
+display name and sample interest selection entirely in screen memory; its
+interest taxonomy, profile visibility, and persistence are not decisions.
+See `phases/PHASE-02-identity-onboarding.md`.

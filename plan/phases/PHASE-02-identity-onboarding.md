@@ -6,6 +6,7 @@
 ## Work
 
 - Prototype the welcome, sign-up, and sign-in screens without transmitting or persisting credentials. Treat email/password as a visual exploration only, not a provider decision.
+- Prototype profile setup with a display name, optional sample interests, and a clearly local-only preview; do not persist profile data or imply discoverability settings.
 - Implement the selected authentication and verification/recovery methods.
 - Add token/session lifecycle, refresh/revocation, secure mobile storage, logout, session-expired recovery, and abuse throttling.
 - Implement profile read/update, topics/interests, privacy preferences, block controls, and account deletion/export entry points.
@@ -22,6 +23,7 @@
 
 - [x] Add a guest-preserving account entry point from Home with welcome, sign-up, and sign-in screens.
 - [x] Add client-side draft validation and clear prototype-only messaging; the forms do not call the API or store credentials.
+- [x] Add a local profile setup/preview screen with optional interests and reduced-motion-aware preview entrance.
 - [ ] Review the screens on Android and iOS and capture the owner's visual/flow feedback.
 - [ ] Decide the authentication method, verification, recovery, and audience/age requirements before implementing a real account flow.
 

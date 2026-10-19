@@ -19,6 +19,7 @@ export default function AccountLayout() {
       <Stack.Screen name="index" options={{ title: 'Welcome' }} />
       <Stack.Screen name="sign-up" options={{ title: 'Create account' }} />
       <Stack.Screen name="sign-in" options={{ title: 'Sign in' }} />
+      <Stack.Screen name="profile" options={{ title: 'Profile setup' }} />
     </Stack>
   );
 }
