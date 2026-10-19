@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient, Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -98,6 +99,62 @@ def test_discover_validates_pagination_before_querying() -> None:
     session.scalars.assert_not_awaited()
 
 
+@pytest.mark.parametrize(
+    "query",
+    [
+        "limit=not-an-integer",
+        "offset=1.5",
+        "limit=0",
+        "limit=101",
+        "limit=-1",
+        "offset=-1",
+        f"q={'q' * 121}",
+        f"topic={'t' * 81}",
+    ],
+)
+def test_discover_rejects_out_of_range_query_parameters(query: str) -> None:
+    session = AsyncMock(spec=AsyncSession)
+
+    response = get(make_test_app(session), f"/api/v1/communities?{query}")
+
+    assert response.status_code == 422
+    session.scalar.assert_not_awaited()
+    session.scalars.assert_not_awaited()
+
+
+def test_discover_accepts_blank_filters_as_noops() -> None:
+    session = AsyncMock(spec=AsyncSession)
+    session.scalar.return_value = 0
+    rows = MagicMock()
+    rows.all.return_value = []
+    session.scalars.return_value = rows
+
+    response = get(make_test_app(session), "/api/v1/communities?q=&topic=%20%20")
+
+    assert response.status_code == 200
+    assert response.json() == {"items": [], "total": 0, "limit": 30, "offset": 0}
+    statement = session.scalars.await_args.args[0]
+    sql = str(statement)
+    assert "ILIKE" not in sql
+    assert "trim(communities.topic)" not in sql
+
+
+def test_discover_accepts_inclusive_query_bounds() -> None:
+    session = AsyncMock(spec=AsyncSession)
+    session.scalar.return_value = 0
+    rows = MagicMock()
+    rows.all.return_value = []
+    session.scalars.return_value = rows
+
+    response = get(
+        make_test_app(session),
+        f"/api/v1/communities?q={'q' * 120}&topic={'t' * 80}&limit=100&offset=0",
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"items": [], "total": 0, "limit": 100, "offset": 0}
+
+
 def test_public_community_detail_returns_a_safe_preview() -> None:
     community = Community(
         id=uuid4(),
@@ -132,10 +189,30 @@ def test_private_or_unknown_community_detail_is_not_disclosed() -> None:
     assert response.json() == {"detail": "Community not found"}
 
 
-def test_community_detail_rejects_invalid_slugs() -> None:
+@pytest.mark.parametrize(
+    "slug",
+    [
+        "Not-A-Slug",
+        "-leading-hyphen",
+        "trailing-hyphen-",
+        "double--hyphen",
+        "a" * 141,
+    ],
+)
+def test_community_detail_rejects_invalid_slugs(slug: str) -> None:
     session = AsyncMock(spec=AsyncSession)
 
-    response = get(make_test_app(session), "/api/v1/communities/Not-A-Slug")
+    response = get(make_test_app(session), f"/api/v1/communities/{slug}")
 
     assert response.status_code == 422
     session.scalar.assert_not_awaited()
+
+
+def test_community_detail_accepts_maximum_length_slug() -> None:
+    session = AsyncMock(spec=AsyncSession)
+    session.scalar.return_value = None
+
+    response = get(make_test_app(session), f"/api/v1/communities/{'a' * 140}")
+
+    assert response.status_code == 404
+    session.scalar.assert_awaited_once()

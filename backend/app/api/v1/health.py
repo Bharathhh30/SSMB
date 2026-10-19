@@ -45,7 +45,7 @@ async def get_readiness(request: Request) -> HealthResponse:
     try:
         async with engine.connect() as connection:
             await connection.execute(text("SELECT 1"))
-    except SQLAlchemyError:
+    except (SQLAlchemyError, OSError):
         logger.warning("Readiness check failed because PostgreSQL is unavailable")
         raise HTTPException(status_code=503, detail="Database is unavailable") from None
 

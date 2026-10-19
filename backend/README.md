@@ -93,8 +93,15 @@ Run checks with:
 ```powershell
 uv run --locked ruff check .
 uv run --locked ruff format --check .
-uv run --locked pytest
+uv run --locked pytest -p no:cacheprovider
 ```
+
+The repository and readiness integration tests require a migrated, disposable
+PostgreSQL database supplied through `TEST_DATABASE_URL`. Do not point this
+variable at the persistent local development database. Without it, those
+database tests are skipped for ordinary local unit-test runs; CI sets the
+variable and treats a missing value as a failure, so the backend job must show
+zero skipped database tests.
 
 Commit `uv.lock` so local and CI installs use the same dependency versions. The
 API reads non-secret settings from the process environment. Copy `.env.example`

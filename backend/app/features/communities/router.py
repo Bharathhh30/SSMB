@@ -18,8 +18,24 @@ DatabaseSession = Annotated[AsyncSession, Depends(get_database_session)]
 )
 async def get_communities(
     session: DatabaseSession,
-    q: Annotated[str | None, Query(min_length=1, max_length=120)] = None,
-    topic: Annotated[str | None, Query(min_length=1, max_length=80)] = None,
+    q: Annotated[
+        str | None,
+        Query(
+            max_length=120,
+            description=(
+                "Case-insensitive partial match. Empty or whitespace-only values are ignored."
+            ),
+        ),
+    ] = None,
+    topic: Annotated[
+        str | None,
+        Query(
+            max_length=80,
+            description=(
+                "Exact topic match after trimming. Empty or whitespace-only values are ignored."
+            ),
+        ),
+    ] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 30,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> CommunityPage:
