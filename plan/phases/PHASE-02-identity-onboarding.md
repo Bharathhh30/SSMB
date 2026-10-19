@@ -1,7 +1,6 @@
 # Phase 2 — Identity, onboarding, and profile APIs
 
-**Status:** Backend work not started — authentication and audience decisions
-remain open; existing mobile mocks are frozen.
+**Status:** In progress — email/password with verification and recovery approved; backend implementation is beginning. Existing mobile mocks remain frozen.
 **Goal:** Implement and exhaustively test identity, session, profile, and
 account APIs before resuming their frontend work.
 
@@ -18,13 +17,16 @@ account APIs before resuming their frontend work.
   access, rate limits, and account controls, including invalid, expired,
   replayed, unauthorized, and cross-user cases.
 
-## Decisions required before affected endpoints
+## Decisions still required before affected endpoints
 
-- Select the authentication method, verification/recovery flow, session/token
-  policy, and required email/SMS delivery adapters. The existing email/password
-  screens are UI mocks only, not an approved design.
+- Select an email-delivery adapter before enabling real verification and
+  recovery delivery. Use fakes in tests and fail explicitly if delivery is not
+  configured; do not log verification or reset tokens.
 - Confirm initial audience/age requirements, profile fields, interest taxonomy,
   profile visibility, and account deletion/export rules.
+
+The approved authentication decision is recorded in
+`../../docs/decisions/0002-email-password-authentication.md`.
 
 ## Deferred frontend work
 
@@ -49,3 +51,17 @@ frontend work.
   sample interests without persistence.
 - [ ] Review the prototype after the backend completion gate and integrate it
   against the approved identity/profile API.
+
+## Backend implementation progress
+
+- [x] Owner approved email/password registration, required email verification,
+  password recovery, and no initial social sign-in.
+- [x] Add a backward-compatible identity/session/action-token schema migration.
+- [x] Add Argon2id password-hashing, email-normalization, and one-time-token
+  primitives with unit tests.
+- [ ] Review endpoint request/response and abuse contracts before opening
+  registration and recovery routes.
+- [ ] Implement registration, email verification, sign-in, session refresh and
+  revocation, sign-out, and current-user endpoints.
+- [ ] Implement rate limits, generic recovery responses, and password reset
+  with the replaceable email-delivery adapter.

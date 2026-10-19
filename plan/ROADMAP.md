@@ -315,7 +315,7 @@ Must be resolved in the indicated phase; absence of a choice must not block plan
 | Product name, brand, public domain, and native app IDs | Decide after the prototype is approved; use an owned namespace for permanent store identifiers | 10 |
 | Audience, age floor, initial locale | Validate launch audience and legal/privacy requirements before identity and public launch | 0/2 |
 | Expo Router and state/data libraries | Prefer Expo Router; choose state, query/cache, and forms libraries based on supported versions and team comfort | 0 |
-| Auth method | Compare email/password, email links, phone, and social sign-in; define verification and recovery | 0 |
+| Auth method | **Approved:** email/password with verified email and account recovery; no social sign-in initially. Email delivery remains behind a replaceable adapter. | 2 |
 | Cloud provider, region, deployment target, budget | Compare managed container hosting, managed PostgreSQL, storage, backups, data residency, and egress cost after prototype signoff | 10 |
 | ORM and DB access | Validate SQLAlchemy async/sync approach, pooling, transaction boundaries, and migration tooling | 0 |
 | Email, push, object storage | Pick providers and define adapters, deliverability, costs, residency, and failure policy | 0/4/5 |
@@ -376,17 +376,19 @@ from this Windows host is blocked by its group-policy-managed inbound firewall.
 
 The SQLAlchemy async/asyncpg choice is provisional and recorded in
 `../docs/decisions/0001-async-sqlalchemy.md`; revisit it at the Phase 0
-architecture decision gate before production. Hosting, authentication, and
-other product/provider decisions remain unresolved as listed above.
+architecture decision gate before production. Hosting and external service
+provider choices remain unresolved as listed above. The owner has approved the
+email/password, verified-email, and account-recovery approach in
+`../docs/decisions/0002-email-password-authentication.md`.
 
 Before the backend-first pivot, local-only identity UI exploration was added:
-Home links to
-welcome, sign-up, and sign-in screens, with guest browsing preserved. The forms
+Home links to welcome, sign-up, and sign-in screens, with guest browsing
+preserved. The forms
 only validate draft input in memory and explicitly do not transmit or save it;
 they do not create accounts or sessions. Email/password is a provisional screen
-prototype, not a chosen authentication method. Authentication, recovery,
-verification, age/audience, and profile persistence remain gated on the Phase 0
-decisions and owner review. A profile setup/preview screen now demonstrates a
+prototype screens, not backend work. Authentication method is now approved;
+age/audience, email delivery, and profile persistence remain gated on their
+phase decisions. A profile setup/preview screen now demonstrates a
 display name and sample interest selection entirely in screen memory; its
 interest taxonomy, profile visibility, and persistence are not decisions.
 See `phases/PHASE-02-identity-onboarding.md`.
@@ -403,3 +405,9 @@ slug boundaries, literal wildcard behavior, pagination stability, visibility
 filters, and PostgreSQL readiness failures are tested. The full suite passed
 39/39 against a fresh migrated PostgreSQL 18 test cluster. No frontend files
 were changed in this slice.
+
+Phase 2 backend work has now started with an identity/session/action-token
+migration, tested Argon2id password and opaque-token helpers, and email
+normalization. The migration passed PostgreSQL upgrade, downgrade/re-upgrade,
+and Alembic drift checks. Registration, verification, sessions, and recovery
+endpoints remain the next implementation work.

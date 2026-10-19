@@ -29,7 +29,7 @@ voice, and engagement remain included.
 |---:|---|---|---|
 | 0 | Product decisions | Resolve only decisions needed before each affected API; define endpoint and permission contracts | Open; keep unresolved decisions explicit |
 | 1 | Engineering foundation | FastAPI, PostgreSQL, Alembic, local test database, health/readiness, API conventions, stable errors/logging | Foundation exists; endpoint edge coverage and repeatable DB test setup need work |
-| 2 | Identity and profile | Registration/sign-in method, verification/recovery, sessions, profile, preferences, account controls | Not implemented; auth method and age/audience decisions remain open |
+| 2 | Identity and profile | Registration/sign-in, verification/recovery, sessions, profile, preferences, account controls | Email/password plus verification/recovery approved; schema/security primitives added; endpoints remain to be implemented |
 | 3 | Communities and discovery | Create/read/update/archive, join/leave/requests, invites, memberships, roles, ownership, access rules | Public read-only discovery exists; write and membership APIs are absent |
 | 4 | Content and files | Posts, links, saved items, file metadata, upload/download authorization and storage adapter | Not implemented; storage and retention decisions remain open |
 | 5 | Messaging and notifications | Conversations, messages, read cursors, notification inbox/outbox, delivery adapters | Not implemented; realtime and push decisions remain open |
@@ -169,6 +169,21 @@ Immediate execution:
   beyond-end pagination.
 - The temporary test cluster was stopped and removed. The persistent Compose
   database was not changed.
+
+### Identity decision and first implementation slice
+
+- The owner approved email/password authentication, mandatory email
+  verification, account recovery, and deferring social sign-in. See
+  `../docs/decisions/0002-email-password-authentication.md`.
+- The first identity migration adds nullable-compatible user email/password
+  hash/verification fields and database-backed session, refresh-token, and
+  action-token records.
+- Tested Argon2id password hashing, normalized email validation, one-time token
+  hashing, and password length/size boundaries have been added. Authentication
+  endpoints and email delivery are still pending.
+- After this slice, the full suite passed **49/49** against a fresh migrated
+  PostgreSQL 18 cluster. Alembic upgrade, downgrade-to-previous-head,
+  re-upgrade, and model-drift checks passed.
 
 ## 7. Deferred frontend integration
 
