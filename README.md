@@ -18,7 +18,7 @@ Use a first terminal from the repository root:
 Set-Location backend
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 uv sync --locked
-docker compose up -d db
+docker compose up -d db mailpit
 uv run --locked alembic upgrade head
 uv run --locked python -m app.scripts.seed_development
 uv run --locked uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --no-access-log
@@ -31,6 +31,8 @@ reach it; keep this development server off public networks.
 
 Check API readiness at `http://127.0.0.1:8000/api/v1/health/ready`.
 Development API docs are at `http://127.0.0.1:8000/docs`.
+The local email catcher is at `http://127.0.0.1:8025`. Authentication payloads
+and a copy/paste PowerShell test flow are in `backend/AUTH_TESTING.md`.
 
 ## 2. Start Expo Go
 

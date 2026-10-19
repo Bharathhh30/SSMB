@@ -9,6 +9,7 @@ from app.db.base import Base
 def test_initial_models_register_user_and_community_tables() -> None:
     assert set(Base.metadata.tables) == {
         "auth_action_tokens",
+        "auth_rate_limit_buckets",
         "auth_refresh_tokens",
         "auth_sessions",
         "communities",
@@ -35,8 +36,7 @@ def test_initial_models_register_user_and_community_tables() -> None:
 def test_authentication_migration_is_the_single_head() -> None:
     script = ScriptDirectory.from_config(Config("alembic.ini"))
 
-    assert script.get_heads() == ["0002_auth_identity_sessions"]
+    assert script.get_heads() == ["0003_auth_rate_limits"]
     assert (
-        script.get_revision("0002_auth_identity_sessions").down_revision
-        == "0001_initial_users_communities"
+        script.get_revision("0003_auth_rate_limits").down_revision == "0002_auth_identity_sessions"
     )

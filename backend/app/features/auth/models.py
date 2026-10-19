@@ -6,6 +6,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     String,
     Uuid,
     func,
@@ -106,3 +107,19 @@ class AuthActionToken(Base):
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AuthRateLimitBucket(Base):
+    __tablename__ = "auth_rate_limit_buckets"
+    __table_args__ = (
+        CheckConstraint(
+            "bucket_key_hash ~ '^[0-9a-f]{64}$'",
+            name="ck_auth_rate_limit_buckets_key_hash_sha256",
+        ),
+        CheckConstraint("attempt_count > 0", name="ck_auth_rate_limit_buckets_attempt_count"),
+        Index("ix_auth_rate_limit_buckets_window_started_at", "window_started_at"),
+    )
+
+    bucket_key_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    window_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False)

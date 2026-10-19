@@ -406,8 +406,10 @@ filters, and PostgreSQL readiness failures are tested. The full suite passed
 39/39 against a fresh migrated PostgreSQL 18 test cluster. No frontend files
 were changed in this slice.
 
-Phase 2 backend work has now started with an identity/session/action-token
-migration, tested Argon2id password and opaque-token helpers, and email
-normalization. The migration passed PostgreSQL upgrade, downgrade/re-upgrade,
-and Alembic drift checks. Registration, verification, sessions, and recovery
-endpoints remain the next implementation work.
+Phase 2 backend now includes identity/session/action-token and rate-limit
+migrations; registration, verification/resend, sign-in, `/me`, refresh/logout,
+and recovery/reset endpoints. The 54-test suite passed against a fresh
+PostgreSQL 18 database, and the copy/paste API smoke flow passed with Mailpit.
+Durable email retry/outbox and scheduled expired-rate-bucket cleanup,
+profile/account controls, and production email configuration remain
+outstanding.

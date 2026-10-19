@@ -170,20 +170,41 @@ Immediate execution:
 - The temporary test cluster was stopped and removed. The persistent Compose
   database was not changed.
 
-### Identity decision and first implementation slice
+### Identity decision, API implementation, and verification
 
 - The owner approved email/password authentication, mandatory email
   verification, account recovery, and deferring social sign-in. See
   `../docs/decisions/0002-email-password-authentication.md`.
-- The first identity migration adds nullable-compatible user email/password
-  hash/verification fields and database-backed session, refresh-token, and
-  action-token records.
-- Tested Argon2id password hashing, normalized email validation, one-time token
-  hashing, and password length/size boundaries have been added. Authentication
-  endpoints and email delivery are still pending.
-- After this slice, the full suite passed **49/49** against a fresh migrated
-  PostgreSQL 18 cluster. Alembic upgrade, downgrade-to-previous-head,
-  re-upgrade, and model-drift checks passed.
+- Current identity routes:
+
+  | Method / route | Purpose | Expected boundary outcomes |
+  |---|---|---|
+  | `POST /api/v1/auth/register` | Create an unverified account and send verification | `202` generic response; schema errors `422`; throttled `429` |
+  | `POST /api/v1/auth/verification/resend` | Reissue verification email | `202` generic response for known/unknown; throttled `429` |
+  | `POST /api/v1/auth/verify-email` | Consume one-time verification token | `200`; invalid/expired/replayed token `400`; throttled `429` |
+  | `POST /api/v1/auth/login` | Create access/refresh session for verified account | `200`; generic bad/unverified credentials `401`; throttled `429` |
+  | `GET /api/v1/auth/me` | Read allowlisted current-user fields | `200`; missing/expired/revoked access token `401` |
+  | `POST /api/v1/auth/refresh` | Rotate refresh token and access session | `200`; invalid/expired/replayed token `401`; replay revokes session |
+  | `POST /api/v1/auth/logout` | Revoke current session | `204`; unauthenticated `401` |
+  | `POST /api/v1/auth/password/forgot` | Request recovery instructions | `202` generic response for known/unknown; throttled `429` |
+  | `POST /api/v1/auth/password/reset` | Consume recovery token and revoke sessions | `200`; invalid/expired/replayed token `400`; invalid password `422` |
+- Identity migrations add nullable-compatible user email/password hash/
+  verification fields, session/refresh/action-token records, and rate-limit
+  buckets.
+- The auth API covers registration, verification/resend, sign-in, `/me`,
+  refresh rotation/replay revocation, logout, generic forgot-password, and
+  one-time password reset.
+- Argon2id hashing, normalized email, one-time token hashing, and password
+  boundaries have unit tests. PostgreSQL integration covers the full auth
+  journey, expiry/replay cases, and login throttling.
+- The full suite passed **54/54** against a fresh migrated PostgreSQL 18
+  cluster; Alembic model-drift checks passed. The copy/paste local test flow
+  passed against the temporary API and Mailpit SMTP catcher.
+- Durable email retries/outbox, scheduled/monitored rate-bucket cleanup,
+  profile/account-control APIs, production SMTP configuration, and a separately
+  managed `AUTH_RATE_LIMIT_SECRET` remain outstanding. The cleanup command is
+  `python -m app.scripts.prune_auth_rate_limits`; it still needs a scheduled,
+  monitored deployment job.
 
 ## 7. Deferred frontend integration
 

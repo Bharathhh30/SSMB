@@ -1,12 +1,13 @@
 # Phase 2 — Identity, onboarding, and profile APIs
 
-**Status:** In progress — email/password with verification and recovery approved; backend implementation is beginning. Existing mobile mocks remain frozen.
+**Status:** In progress — the email/password identity API slice is implemented and integration-tested. Profile/account-control APIs remain; mobile mocks are frozen.
 **Goal:** Implement and exhaustively test identity, session, profile, and
 account APIs before resuming their frontend work.
 
 ## Backend work
 
-- Implement the selected authentication and verification/recovery methods.
+- Implement and harden registration, verification, sign-in, session rotation,
+  sign-out, recovery, and password reset.
 - Add token/session lifecycle, refresh/revocation, secure session handling,
   logout, session-expired behavior, and abuse throttling.
 - Implement profile read/update, interests, privacy preferences, block controls,
@@ -19,9 +20,11 @@ account APIs before resuming their frontend work.
 
 ## Decisions still required before affected endpoints
 
-- Select an email-delivery adapter before enabling real verification and
-  recovery delivery. Use fakes in tests and fail explicitly if delivery is not
-  configured; do not log verification or reset tokens.
+- Local development uses the replaceable SMTP adapter with Mailpit. Select and
+  configure production email delivery before launch; do not log verification or
+  reset tokens.
+- Staging/production must provide `AUTH_RATE_LIMIT_SECRET` through their secret
+  manager.
 - Confirm initial audience/age requirements, profile fields, interest taxonomy,
   profile visibility, and account deletion/export rules.
 
@@ -59,9 +62,19 @@ frontend work.
 - [x] Add a backward-compatible identity/session/action-token schema migration.
 - [x] Add Argon2id password-hashing, email-normalization, and one-time-token
   primitives with unit tests.
-- [ ] Review endpoint request/response and abuse contracts before opening
-  registration and recovery routes.
-- [ ] Implement registration, email verification, sign-in, session refresh and
+- [x] Review request/response and abuse contracts for account lifecycle routes.
+- [x] Implement registration, email verification, sign-in, session refresh and
   revocation, sign-out, and current-user endpoints.
-- [ ] Implement rate limits, generic recovery responses, and password reset
-  with the replaceable email-delivery adapter.
+- [x] Implement generic recovery responses, password reset, and database-backed
+  rate limits with a replaceable SMTP adapter.
+- [x] Verify the auth journey and rate-limit behavior against PostgreSQL; test
+  the local SMTP path through Mailpit.
+- [x] Verify Alembic drift and run the complete database-backed suite with zero
+  skipped tests.
+- [x] Document copy/paste payloads and provide a PowerShell smoke script that
+  exercises the full local auth journey without Swagger.
+- [x] Add a bounded rate-limit bucket cleanup command.
+- [ ] Schedule/monitor that cleanup and add durable email retry/outbox behavior
+  before production hardening.
+- [ ] Implement profile read/update, privacy/block controls, and account
+  deletion/export endpoints.

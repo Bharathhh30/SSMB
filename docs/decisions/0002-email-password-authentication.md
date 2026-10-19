@@ -28,8 +28,11 @@
   refresh tokens. Detect refresh-token reuse and revoke the affected session.
 - Return generic registration and recovery responses to reduce account
   enumeration. Do not log passwords, tokens, or private email contents.
-- Use fake email delivery in tests. Real/local email delivery requires a
-  configured adapter; do not pretend an email was sent when no adapter exists.
+- Use fake email delivery in tests and a generic SMTP adapter in the application.
+  Mailpit is only a local development catcher; no production mail vendor is
+  selected.
+- Apply database-backed rate limits to login, email actions, and token actions;
+  staging/production require a separately configured `AUTH_RATE_LIMIT_SECRET`.
 
 ## Consequences
 
@@ -45,7 +48,10 @@
 
 ## Implementation status
 
-The schema migration and tested password/email/token primitives are in place.
-Registration, verification, session, and recovery endpoints plus configured
-email delivery are still pending; this ADR does not claim authentication is
-implemented or production-ready.
+Registration, verification/resend, sign-in, `/me`, refresh/logout,
+forgot/reset-password, and database-backed rate-limit endpoints are implemented
+and covered by PostgreSQL integration flows. The complete smoke script passed
+using the local SMTP adapter and Mailpit. Durable email retries/outbox,
+scheduled rate-bucket cleanup, production email configuration,
+profile/account-control endpoints, and broader security review remain before
+production readiness.

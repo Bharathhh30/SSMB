@@ -9,11 +9,16 @@ from app.api.v1.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.http_logging import RequestLoggingMiddleware
 from app.db.engine import create_database_engine
+from app.integrations.auth_email import AuthEmailSender, SMTPAuthEmailSender
 
 API_V1_PREFIX = "/api/v1"
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    *,
+    auth_email_sender: AuthEmailSender | None = None,
+) -> FastAPI:
     configuration = settings or get_settings()
     is_development = configuration.app_env == "development"
 
@@ -44,6 +49,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     application.state.database_engine = None
     application.state.database_session_factory = None
+    application.state.settings = configuration
+    application.state.auth_email_sender = auth_email_sender or SMTPAuthEmailSender(configuration)
     application.add_middleware(RequestLoggingMiddleware)
     application.include_router(api_router, prefix=API_V1_PREFIX)
     return application

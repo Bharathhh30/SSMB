@@ -12,7 +12,7 @@ From the repository root:
 Set-Location backend
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 uv sync --locked
-docker compose up -d db
+docker compose up -d db mailpit
 uv run --locked alembic upgrade head
 uv run --locked python -m app.scripts.seed_development
 uv run uvicorn app.main:app --reload --host 127.0.0.1 --no-access-log
@@ -21,6 +21,11 @@ uv run uvicorn app.main:app --reload --host 127.0.0.1 --no-access-log
 The API liveness endpoint is `http://127.0.0.1:8000/api/v1/health`; database
 readiness is `http://127.0.0.1:8000/api/v1/health/ready`. Interactive API docs
 are available at `http://127.0.0.1:8000/docs` in development only.
+The local development SMTP catcher is available at `http://127.0.0.1:8025`;
+verification and password-reset tokens are sent there, not written to API logs.
+Run the authentication flow without Swagger payload authoring from a second
+terminal with `.\scripts\smoke-auth.ps1`; see `AUTH_TESTING.md` for individual
+request bodies and negative cases.
 
 The database port is bound to loopback only. Do not expose PostgreSQL through a
 tunnel; expose the API instead. `.env.example` contains local-only development
@@ -107,6 +112,11 @@ Commit `uv.lock` so local and CI installs use the same dependency versions. The
 API reads non-secret settings from the process environment. Copy `.env.example`
 to `.env` only for local overrides; never commit `.env` or production
 credentials.
+Staging/production must provide SMTP/TLS configuration and a strong
+`AUTH_RATE_LIMIT_SECRET` through the deployment secret manager.
+To prune expired authentication rate-limit buckets in a controlled maintenance
+job, run `uv run --locked python -m app.scripts.prune_auth_rate_limits`; schedule
+and monitor that command in the production environment.
 
 ## Request logging
 
