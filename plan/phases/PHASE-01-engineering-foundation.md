@@ -1,50 +1,58 @@
-# Phase 1 — Local prototype foundation
+# Phase 1 — Backend engineering foundation
 
-**Status:** In progress — local-first; production delivery is deferred until the prototype is approved.
-**Goal:** Make the Expo app and FastAPI/PostgreSQL backend easy to run locally so the user can inspect the experience and guide iterative improvements.
+**Status:** In progress — local backend exists; endpoint edge coverage and a
+repeatable disposable PostgreSQL test workflow are the active tasks.
+**Goal:** Make the FastAPI/PostgreSQL backend safe to extend and easy to test.
 
-## Work
+## Implementation order
 
-- Keep the Expo/TypeScript app runnable in Expo Go on iOS and Android without a cloud project or store identifiers.
-- Document local PostgreSQL startup, Alembic migration, deterministic development seed, FastAPI readiness, and the mobile API URL for simulator, emulator, or a phone on the same Wi-Fi.
-- Iterate on the local discover → public preview flow, with loading, empty, error, retry, and accessibility behavior.
-- Keep formatting, type, unit, backend integration, and Expo export checks easy to run locally. The existing GitHub Actions workflow remains a useful optional regression check.
+Backend/API work only. The Expo app and its existing local screens are preserved
+but frozen; no frontend feature or dependency work is scheduled until the
+Backend Completion Gate in `../BACKEND_FIRST_EXECUTION.md` passes.
 
-## Deferred until the prototype is approved
+## Backend scope
 
-- Product brand, public domain, permanent iOS bundle ID, and Android application ID.
-- EAS project linking, custom development clients, signing credentials, store accounts, and releases.
-- Hosted API/PostgreSQL, deployment regions, paid cloud resources, remote tunnels for friends, and production environments.
-- Required branch protections and automatic deployments. Existing branches/workflows are scaffolding only during local prototyping.
+- Keep the FastAPI API versioned under `/api/v1` and organized as a modular
+  monolith with routes, schemas, services, repositories, and models separated.
+- Keep PostgreSQL schema changes in reviewed Alembic revisions.
+- Provide local startup, readiness, deterministic development seed, and
+  disposable PostgreSQL integration-test instructions.
+- Expand edge-case coverage for health/readiness, public community discovery,
+  topic listing, and public preview before starting new feature endpoints.
+- Standardize validation/error shapes, request IDs, redacted logs, pagination,
+  and OpenAPI contracts.
+- Run backend format, lint, unit/API tests, migration checks, and
+  PostgreSQL-backed integration tests independently of mobile CI.
 
-## Deliverables
+## Deferred
 
-- Reproducible local Expo/FastAPI/PostgreSQL setup with a tested migration and seeded prototype communities.
-- Developer can change a local API URL in `mobile/.env.development.local` without editing screens or source constants.
-- User can open the prototype in Expo Go and review Discover and a public community preview before any deployment decisions.
+- New Expo screens, frontend navigation/dependencies, and mobile API wiring.
+- Hosting, custom domains, paid cloud resources, and production environments.
+- Branch protections and deployment automation until production choices are
+  approved.
 
-## Progress checkpoint
+## Existing foundation
 
-- [x] Expo Router tabs scaffold created with TypeScript and the current SDK-compatible Reanimated/worklets dependencies.
-- [x] Dependencies locked; transitive overrides applied for the scaffold audit advisories.
-- [x] Clean `npm ci`, Expo SDK compatibility check, Expo Doctor, TypeScript, mobile unit tests, and web/iOS/Android JavaScript exports pass.
-- [x] Replace template screens with a themed, guest-safe Home and API-backed Discover flow.
-- [x] Remove fixture membership claims and provide topic shortcuts until identity/membership exists.
-- [x] Add the FastAPI health/discovery API, PostgreSQL configuration, initial users/communities schema, Alembic revision, and explicit development seed.
-- [x] Add typed mobile API URL configuration, request/error handling, and a GitHub Actions PR workflow with a PostgreSQL service.
-- [x] Add mobile API contract unit tests and wire them into pull-request CI.
-- [x] Surface validated server request IDs as selectable references in mobile API error states.
-- [x] Add a non-root API container image and CI build/readiness smoke-test definition.
-- [x] Add request IDs and redacted structured HTTP logs with a generic unexpected-error response.
-- [x] Apply the initial migration and run the backend suite against an isolated temporary local PostgreSQL cluster; verify `/api/v1/health/ready` against that migrated database.
-- [x] Make the local API URL template point to the backend on the same machine by default and document Android-emulator/physical-device overrides.
-- [x] User reports inspecting the prototype UI in Android Studio.
-- [ ] Confirm API-backed discovery/preview works in the Android Studio emulator and record the user's UI feedback for the next iteration.
-- [ ] Validate the local flow on iOS when a Mac simulator or physical iPhone is available.
-- [ ] Before remote CI becomes a required gate, resolve the two unpatched mobile audit findings or record an owner-approved, time-bounded disposition; see `docs/security/MOBILE-NPM-AUDIT-2026-10-16.md`.
+- [x] FastAPI liveness and database-readiness endpoints.
+- [x] Async SQLAlchemy/PostgreSQL configuration and initial users/communities
+  Alembic revision.
+- [x] Public open-community list, topic list, and public-preview endpoints.
+- [x] Request IDs and redacted structured HTTP logs.
+- [x] Explicit development seed command guarded by `APP_ENV=development`.
+- [x] Backend formatting and lint checks pass.
+- [x] Expand current endpoint boundary and failure-case tests for community
+  discovery and slug validation.
+- [x] Run the full suite against a fresh PostgreSQL 18 temporary cluster after
+  applying Alembic; the full run passed without skipped tests.
+- [x] Ensure PostgreSQL-backed tests cannot be skipped in CI when
+  `TEST_DATABASE_URL` is missing.
 
 ## Exit criteria
 
-- Clean checkout can start PostgreSQL, apply the migration, seed demo data, and start FastAPI using documented local commands.
-- Expo Go can reach the local API on a simulator/emulator or a phone on the same trusted network.
-- The user has inspected the local app and the first prototype iteration is accepted before cloud/domain/store decisions begin.
+- Clean setup starts a local API and PostgreSQL database, applies Alembic
+  migrations, and seeds development data using documented commands.
+- The backend unit/API suite and database-backed integration suite are
+  repeatable; no DB-backed tests are silently skipped in the designated CI
+  environment.
+- Existing public endpoints have documented contracts and edge-case tests.
+- Migration, lint, and format checks pass.

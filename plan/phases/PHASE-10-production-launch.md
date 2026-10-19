@@ -5,6 +5,9 @@
 
 ## Work
 
+- This remains the final delivery phase. Do not begin hosted deployment or store
+  release until the backend completion gate has passed and the deferred
+  frontend journeys have been integrated and accepted.
 - After the prototype is approved, finalize product brand/domain, permanent iOS/Android identifiers, hosting provider/region/budget, and data-residency requirements.
 - Configure EAS project/signing/store accounts, hosted API and PostgreSQL environments, required branch protections, secrets, deployment pipelines, and remote-test URLs.
 - Complete dependency/security review, threat model refresh, privacy/accessibility review, load/soak tests, and mobile device matrix.

@@ -1,11 +1,18 @@
 # Community Platform — Cumulative Product and Engineering Roadmap
 
 **Status:** Implementation in progress
-**Last updated:** 2026-10-16
+**Last updated:** 2026-10-19
 **Product source:** `../Community_Platform_Concept.md`
 **Repository guidance:** `../AGENTS.md`
 
 This is the cumulative source of truth for product scope, interfaces, technical direction, delivery, and phase gates. Detailed phase checklists live in `plan/phases/`. Work proceeds in order, but each phase may be split into independently reviewable vertical slices.
+
+**Implementation sequencing update (2026-10-19):** Work is now backend-first.
+Freeze mobile/frontend feature changes until every backend domain has a tested
+API contract and the Backend Completion Gate in
+`BACKEND_FIRST_EXECUTION.md` passes. Preserve the existing Expo prototype; do
+not expand it or discard it. This changes implementation order, not product
+scope, and deployment remains last.
 
 ## 1. Product direction
 
@@ -286,16 +293,18 @@ Detailed tasks, outputs, and acceptance checks are in the linked files.
 | Phase | Scope | Exit gate |
 |---|---|---|
 | 0 — Product decisions & design contracts | Validate personas, MVP sequence, permissions, privacy/moderation policy, providers, UX/API contracts, risk decisions | Approved scope, key architecture decisions, interface map, acceptance criteria |
-| 1 — Local prototype foundation | Expo Go app, local FastAPI/PostgreSQL, Alembic, local URL config, discovery and preview UI | Fresh local setup, migrated/seeded API, app-to-API smoke on iOS/Android, prototype feedback |
-| 2 — Identity & onboarding | Auth, profile, sessions, account/security settings, consent/legal entry points | Secure critical identity journeys and authorization tests |
-| 3 — Communities & discovery | Create/manage/search/join/leave, access rules, invites, membership roles | End-to-end discover-to-join and owner/moderator permissions |
-| 4 — Content, materials & files | Posts, links, PDFs/documents, private storage, saved items, report entry points | Secure sharing and upload/download flows with limits and auditability |
-| 5 — Messaging & notifications | Community conversations, real-time delivery, read/unread, push/in-app preferences | Reconnect/retry behavior, notification controls, abuse controls |
-| 6 — Scheduling, rooms & reminders | Events/sessions, reservations, conflicts, RSVP/notify-me, reminders | Correct timezone, conflict/idempotency, cancel/reschedule behavior |
-| 7 — Moderation & trust/safety | Reports, queues, audit, escalation, actions/appeals, operator tools | Human-review process, abuse resistance, permission/audit tests |
-| 8 — Voice rooms | Provider integration, lobby, participation/host controls, failure/rejoin, safety and cost controls | Cross-platform audio QA, permission/safety policy, capacity and cost review |
-| 9 — Streaks & engagement | Activity ledger, streaks, reminders, privacy/quiet hours, engagement metrics | User-controlled engagement with correct timezone and privacy semantics |
-| 10 — Final identity, production readiness & launch | Confirm brand/domain/app IDs and provider/region/budget; EAS signing, hosted API/database, CI/CD protections, hardening, store release, runbooks, staged rollout | Go/no-go checklist signed, restore/rollback rehearsed, monitoring/support in place |
+| 1 — Backend foundation | Local FastAPI/PostgreSQL, Alembic, API conventions, endpoint edge coverage, disposable database test workflow | Backend tests and migrations run reproducibly with PostgreSQL; mobile work is frozen |
+| 2 — Identity & profile APIs | Authentication, verification/recovery, sessions, profile and account controls | Secure endpoint journeys and authorization/abuse tests |
+| 3 — Community APIs | Create/manage/search/join/leave, access, invites, membership and roles | End-to-end API behavior and owner/moderator permissions tested |
+| 4 — Content and file APIs | Posts, links, documents, private storage boundary and saved items | Secure API sharing and upload/download edge tests |
+| 5 — Messaging and notification APIs | Conversations, messages, delivery boundaries, inbox and preferences | Reconnect/history, authorization, retries and abuse tests |
+| 6 — Scheduling APIs | Events, reservations, RSVP, conflicts and reminders | Timezone, concurrency/idempotency and cancellation tests |
+| 7 — Moderation APIs | Reports, queues, escalation, actions, audit and appeals | Human-review rules, abuse resistance and access-control tests |
+| 8 — Voice APIs | Authorized room/session control and provider adapter boundary | Policy/provider decisions, safety contract and failure tests |
+| 9 — Engagement APIs | Activity ledger, streak calculation and user-controlled reminder settings | Deterministic timezone, duplicate-event and privacy tests |
+| Backend Completion Gate | All backend domains, migrations, OpenAPI contracts, security and edge-case tests complete | No skipped PostgreSQL tests; every endpoint has its applicable test matrix |
+| Frontend integration (deferred) | Resume Expo feature work and connect complete user journeys to the tested API | Cross-platform journeys pass against the local backend; no direct DB access |
+| 10 — Final production readiness & launch | Final provider/domain choices, hosting, CI/CD, store delivery, hardening, runbooks and rollout | Go/no-go, restore/rollback rehearsal, monitoring and support in place |
 
 ## 13. Open decisions register
 
@@ -370,7 +379,8 @@ The SQLAlchemy async/asyncpg choice is provisional and recorded in
 architecture decision gate before production. Hosting, authentication, and
 other product/provider decisions remain unresolved as listed above.
 
-Phase 2 has begun with a local-only identity UI exploration: Home now links to
+Before the backend-first pivot, local-only identity UI exploration was added:
+Home links to
 welcome, sign-up, and sign-in screens, with guest browsing preserved. The forms
 only validate draft input in memory and explicitly do not transmit or save it;
 they do not create accounts or sessions. Email/password is a provisional screen
@@ -380,3 +390,16 @@ decisions and owner review. A profile setup/preview screen now demonstrates a
 display name and sample interest selection entirely in screen memory; its
 interest taxonomy, profile visibility, and persistence are not decisions.
 See `phases/PHASE-02-identity-onboarding.md`.
+These screens are prototypes only and do not count as completed backend work.
+
+The mobile prototype is now frozen while backend work takes priority. The
+backend-first order, API edge-case matrix, completion gate, and current test
+baseline are maintained in `BACKEND_FIRST_EXECUTION.md`. Existing mobile code
+and CI checks remain preserved, but no new frontend feature work should begin
+until the backend gate passes.
+
+The first backend hardening slice is verified: community-discovery query and
+slug boundaries, literal wildcard behavior, pagination stability, visibility
+filters, and PostgreSQL readiness failures are tested. The full suite passed
+39/39 against a fresh migrated PostgreSQL 18 test cluster. No frontend files
+were changed in this slice.

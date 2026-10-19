@@ -1,30 +1,51 @@
-# Phase 2 — Identity, onboarding, and profile
+# Phase 2 — Identity, onboarding, and profile APIs
 
-**Status:** In progress — local UI exploration only; authentication method and provider remain undecided.
-**Goal:** Progressively prototype identity/onboarding, then implement secure account access after the owner approves the authentication approach.
+**Status:** Backend work not started — authentication and audience decisions
+remain open; existing mobile mocks are frozen.
+**Goal:** Implement and exhaustively test identity, session, profile, and
+account APIs before resuming their frontend work.
 
-## Work
+## Backend work
 
-- Prototype the welcome, sign-up, and sign-in screens without transmitting or persisting credentials. Treat email/password as a visual exploration only, not a provider decision.
-- Prototype profile setup with a display name, optional sample interests, and a clearly local-only preview; do not persist profile data or imply discoverability settings.
 - Implement the selected authentication and verification/recovery methods.
-- Add token/session lifecycle, refresh/revocation, secure mobile storage, logout, session-expired recovery, and abuse throttling.
-- Implement profile read/update, topics/interests, privacy preferences, block controls, and account deletion/export entry points.
-- Build welcome, registration/login, verification, recovery, profile, and security/settings screens.
-- Add server-side authorization, redacted structured audit/security events, and privacy/legal consent capture as required.
+- Add token/session lifecycle, refresh/revocation, secure session handling,
+  logout, session-expired behavior, and abuse throttling.
+- Implement profile read/update, interests, privacy preferences, block controls,
+  and account deletion/export entry points.
+- Add server-side authorization, redacted security/audit events, and consent
+  capture as required by approved policy.
+- Test signup, signin, verification, recovery, refresh, revoke, logout, profile
+  access, rate limits, and account controls, including invalid, expired,
+  replayed, unauthorized, and cross-user cases.
+
+## Decisions required before affected endpoints
+
+- Select the authentication method, verification/recovery flow, session/token
+  policy, and required email/SMS delivery adapters. The existing email/password
+  screens are UI mocks only, not an approved design.
+- Confirm initial audience/age requirements, profile fields, interest taxonomy,
+  profile visibility, and account deletion/export rules.
+
+## Deferred frontend work
+
+The current welcome, sign-up/sign-in, and profile-preview screens remain in the
+repository as disposable prototypes. Do not extend or connect them until this
+phase's API contracts and tests pass and the Backend Completion Gate opens
+frontend work.
 
 ## Exit criteria
 
-- Signup/login/recovery/logout/session-expiry work on iOS and Android.
-- Negative tests cover invalid credentials, expired/replayed refresh, unauthorized profile access, and rate limits.
-- Account data is never exposed through client bundles or logs; deletion/export behavior is documented.
+- Account lifecycle endpoints work with approved verification/recovery policy.
+- Negative tests cover invalid credentials, expired/replayed/revoked sessions,
+  unauthorized profile access, cross-user access, and throttling.
+- Account data is never exposed through response models or logs; deletion/export
+  behavior and retention are documented and tested.
 
-## Local prototype progress
+## Preserved frontend prototype (frozen; not backend progress)
 
-- [x] Add a guest-preserving account entry point from Home with welcome, sign-up, and sign-in screens.
-- [x] Add client-side draft validation and clear prototype-only messaging; the forms do not call the API or store credentials.
-- [x] Add a local profile setup/preview screen with optional interests and reduced-motion-aware preview entrance.
-- [ ] Review the screens on Android and iOS and capture the owner's visual/flow feedback.
-- [ ] Decide the authentication method, verification, recovery, and audience/age requirements before implementing a real account flow.
-
-This prototype does not create a user, establish a session, or unlock protected community actions.
+- [x] Guest-preserving welcome, sign-up, and sign-in screens exist locally.
+- [x] Client-side draft validation is local-only and does not contact the API.
+- [x] A local profile setup/preview screen demonstrates a display name and
+  sample interests without persistence.
+- [ ] Review the prototype after the backend completion gate and integrate it
+  against the approved identity/profile API.

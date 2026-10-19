@@ -4,6 +4,11 @@
 **Source of truth:** `../ROADMAP.md`
 **Goal:** Turn the community concept into a testable product and architecture baseline before implementation.
 
+**Sequencing note:** Backend implementation now precedes frontend implementation.
+Resolve decisions incrementally at the affected backend phase gate; do not
+block decision-independent backend work, and do not start new mobile work before
+the Backend Completion Gate.
+
 ## Work
 
 - Validate only the product assumptions needed for the local prototype; defer final brand, public domain, and app-store identifiers until the prototype is approved.
@@ -11,6 +16,7 @@
 - Turn the screen/interface inventory into user flows and low-fidelity wireframes for iOS and Android, including accessibility and failure states.
 - Define the permission matrix for visitor, member, moderator, founder, and platform operator.
 - Write API conventions, initial OpenAPI resource schemas, pagination/error/idempotency patterns, and version compatibility policy.
+- Define endpoint-level edge-case and authorization test expectations; keep OpenAPI as the eventual frontend integration contract.
 - Define initial PostgreSQL domain boundaries, retention/deletion/export rules, and the migration review process.
 - Defer cloud host/region/budget and EAS/store setup until after prototype signoff. Evaluate auth, email, notifications, realtime, voice, and monitoring only before their implementation phases.
 - Define community privacy defaults, invite/access behavior, content policy, report evidence handling, five-report escalation semantics, appeals, and moderation staffing assumptions.
