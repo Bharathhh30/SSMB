@@ -29,7 +29,7 @@ voice, and engagement remain included.
 |---:|---|---|---|
 | 0 | Product decisions | Resolve only decisions needed before each affected API; define endpoint and permission contracts | Open; keep unresolved decisions explicit |
 | 1 | Engineering foundation | FastAPI, PostgreSQL, Alembic, local test database, health/readiness, API conventions, stable errors/logging | Foundation exists; endpoint edge coverage and repeatable DB test setup need work |
-| 2 | Identity and profile | Registration/sign-in, verification/recovery, sessions, profile, preferences, account controls | Email/password plus verification/recovery approved; schema/security primitives added; endpoints remain to be implemented |
+| 2 | Identity and profile | Registration/sign-in, verification/recovery, sessions, profile, preferences, account controls | Auth and private self-profile endpoints implemented/tested; privacy, block, deletion/export APIs remain |
 | 3 | Communities and discovery | Create/read/update/archive, join/leave/requests, invites, memberships, roles, ownership, access rules | Public read-only discovery exists; write and membership APIs are absent |
 | 4 | Content and files | Posts, links, saved items, file metadata, upload/download authorization and storage adapter | Not implemented; storage and retention decisions remain open |
 | 5 | Messaging and notifications | Conversations, messages, read cursors, notification inbox/outbox, delivery adapters | Not implemented; realtime and push decisions remain open |
@@ -87,6 +87,8 @@ reason rather than silently omitting it.
 | `GET /api/v1/communities` | Open and unexpired communities only; bounded pagination; `q` partial case-insensitive, `topic` exact after trim | Input bounds, blank normalization, wildcard escaping, active/expired/private filtering, stable order, beyond-end offset |
 | `GET /api/v1/communities/{slug}` | Public preview only; private, expired, and unknown slugs are indistinguishable 404s | Slug alphabet/length, expiry boundary, private metadata non-disclosure, response field allowlist |
 | `GET /api/v1/topics` | Distinct trimmed topics with active open communities; capped at 50 | Exclude private/expired, trim/dedupe, ordering, cap, DB unavailable |
+| `GET /api/v1/profile/me` | Authenticated caller's display name and private interests only | Missing/expired/revoked auth, no email/hash leakage, empty interests |
+| `PATCH /api/v1/profile/me` | Update caller's display name and private free-form interests | Blank/null/unknown/oversized/duplicate values, atomic replacement, clear list |
 
 This is only the currently implemented public surface. Each new feature phase
 must add its endpoint inventory and test matrix before its API is considered
@@ -188,21 +190,23 @@ Immediate execution:
   | `POST /api/v1/auth/logout` | Revoke current session | `204`; unauthenticated `401` |
   | `POST /api/v1/auth/password/forgot` | Request recovery instructions | `202` generic response for known/unknown; throttled `429` |
   | `POST /api/v1/auth/password/reset` | Consume recovery token and revoke sessions | `200`; invalid/expired/replayed token `400`; invalid password `422` |
+  | `GET /api/v1/profile/me` | Read caller's private profile | `200`; unauthenticated/expired/revoked session `401` |
+  | `PATCH /api/v1/profile/me` | Update caller's display name/private interests | `200`; invalid/duplicate/oversized/unknown fields `422`; unauthenticated `401` |
 - Identity migrations add nullable-compatible user email/password hash/
   verification fields, session/refresh/action-token records, and rate-limit
   buckets.
-- The auth API covers registration, verification/resend, sign-in, `/me`,
-  refresh rotation/replay revocation, logout, generic forgot-password, and
-  one-time password reset.
+- The identity/profile APIs cover registration, verification/resend, sign-in,
+  `/me`, refresh rotation/replay revocation, logout, forgot/reset-password, and
+  self-only profile display-name/interest updates.
 - Argon2id hashing, normalized email, one-time token hashing, and password
   boundaries have unit tests. PostgreSQL integration covers the full auth
   journey, expiry/replay cases, and login throttling.
-- The full suite passed **54/54** against a fresh migrated PostgreSQL 18
+- The full suite passed **55/55** against a fresh migrated PostgreSQL 18
   cluster; Alembic model-drift checks passed. The copy/paste local test flow
   passed against the temporary API and Mailpit SMTP catcher.
 - Durable email retries/outbox, scheduled/monitored rate-bucket cleanup,
-  profile/account-control APIs, production SMTP configuration, and a separately
-  managed `AUTH_RATE_LIMIT_SECRET` remain outstanding. The cleanup command is
+  profile privacy/block/account-control APIs, production SMTP configuration,
+  and a separately managed `AUTH_RATE_LIMIT_SECRET` remain outstanding. The cleanup command is
   `python -m app.scripts.prune_auth_rate_limits`; it still needs a scheduled,
   monitored deployment job.
 

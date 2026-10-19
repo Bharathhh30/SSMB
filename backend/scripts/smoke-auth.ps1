@@ -101,6 +101,22 @@ if ($profile.email -ne $email) {
   throw "Authenticated profile returned an unexpected email."
 }
 
+$profileDraft = Invoke-RestMethod `
+  -Method Patch `
+  -Uri "$ApiBaseUrl/profile/me" `
+  -ContentType "application/json" `
+  -Headers $authHeaders `
+  -Body (ConvertTo-Json -InputObject @{
+    display_name = "Backend smoke profile"
+    interests = @("Exam prep", "Technology")
+  } -Depth 5)
+if (
+  $profileDraft.display_name -ne "Backend smoke profile" -or
+  $profileDraft.interests.Count -ne 2
+) {
+  throw "Private profile update did not persist."
+}
+
 $refreshed = Invoke-JsonPost -Path "/auth/refresh" -Body @{
   refresh_token = $login.refresh_token
 }

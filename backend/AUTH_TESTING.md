@@ -26,8 +26,8 @@ Set-Location backend
 The script generates a unique local test email and sends all verification and
 recovery mail to the local Mailpit catcher at `http://127.0.0.1:8025`; it does
 not contact external email addresses. It verifies registration, one-time email
-verification, sign-in, `/me`, refresh rotation/replay revocation, password
-recovery, and sign-out.
+verification, sign-in, `/me`, private profile update, refresh rotation/replay
+revocation, password recovery, and sign-out.
 
 The generated account remains in the development database. Use a disposable
 database if you do not want test accounts retained.
@@ -67,6 +67,26 @@ and token values. Verification/reset tokens are in the matching Mailpit email.
 Use the returned `access_token` as `Authorization: Bearer <token>` for
 `GET /api/v1/auth/me` and `POST /api/v1/auth/logout`.
 
+**Read private self-profile**
+
+```http
+GET /api/v1/profile/me
+Authorization: Bearer <access_token>
+```
+
+**Update display name and private interests**
+
+```json
+{
+  "display_name": "Backend Test",
+  "interests": ["Exam prep", "Technology"]
+}
+```
+
+Send that body to `PATCH /api/v1/profile/me` with the same bearer token.
+Interests are free-form, private to the account, and case-insensitive duplicate
+values are rejected; no public profile-visibility policy is implied.
+
 **Refresh**
 
 ```json
@@ -103,5 +123,9 @@ Use the returned `access_token` as `Authorization: Bearer <token>` for
   the configured rate-limit window is exceeded.
 - Expired verification, recovery, access, or refresh token: rejected; no
   account/session mutation is accepted.
+- Empty profile patches, blank display names/interests, duplicate interests,
+  more than 20 interests, and unknown fields: `422`.
+- `GET /api/v1/profile/me` and `PATCH /api/v1/profile/me` without a valid
+  bearer token: `401`.
 - Old password after recovery: generic `401`.
 - Access token after sign-out: `401`.

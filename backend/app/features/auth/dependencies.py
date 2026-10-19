@@ -63,6 +63,8 @@ async def require_authenticated_principal(
             AuthSession.revoked_at.is_(None),
             AuthSession.access_expires_at > datetime.now(UTC),
             User.email_verified_at.is_not(None),
+            User.email.is_not(None),
+            User.display_name.is_not(None),
         )
     )
     result = await session.execute(statement)

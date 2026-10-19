@@ -14,6 +14,7 @@ def test_initial_models_register_user_and_community_tables() -> None:
         "auth_sessions",
         "communities",
         "users",
+        "user_interests",
     }
 
     communities = Base.metadata.tables["communities"]
@@ -36,7 +37,7 @@ def test_initial_models_register_user_and_community_tables() -> None:
 def test_authentication_migration_is_the_single_head() -> None:
     script = ScriptDirectory.from_config(Config("alembic.ini"))
 
-    assert script.get_heads() == ["0003_auth_rate_limits"]
+    assert script.get_heads() == ["0004_private_user_interests"]
     assert (
-        script.get_revision("0003_auth_rate_limits").down_revision == "0002_auth_identity_sessions"
+        script.get_revision("0004_private_user_interests").down_revision == "0003_auth_rate_limits"
     )

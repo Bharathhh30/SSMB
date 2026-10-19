@@ -408,8 +408,8 @@ were changed in this slice.
 
 Phase 2 backend now includes identity/session/action-token and rate-limit
 migrations; registration, verification/resend, sign-in, `/me`, refresh/logout,
-and recovery/reset endpoints. The 54-test suite passed against a fresh
-PostgreSQL 18 database, and the copy/paste API smoke flow passed with Mailpit.
-Durable email retry/outbox and scheduled expired-rate-bucket cleanup,
-profile/account controls, and production email configuration remain
-outstanding.
+recovery/reset, and self-profile read/update endpoints. The 55-test suite passed
+against a fresh PostgreSQL 18 database, and the copy/paste API smoke flow passed
+with Mailpit. Durable email retry/outbox and scheduled expired-rate-bucket
+cleanup, profile privacy/block/account controls, and production email
+configuration remain outstanding.

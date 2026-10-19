@@ -7,6 +7,7 @@ from app.features.auth.models import (
     AuthSession,
 )
 from app.features.communities.models import Community
+from app.features.profiles.models import UserInterest
 from app.features.users.models import User
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "AuthSession",
     "Community",
     "User",
+    "UserInterest",
 ]

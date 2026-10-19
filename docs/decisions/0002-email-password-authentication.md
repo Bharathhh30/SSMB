@@ -53,5 +53,5 @@ forgot/reset-password, and database-backed rate-limit endpoints are implemented
 and covered by PostgreSQL integration flows. The complete smoke script passed
 using the local SMTP adapter and Mailpit. Durable email retries/outbox,
 scheduled rate-bucket cleanup, production email configuration,
-profile/account-control endpoints, and broader security review remain before
-production readiness.
+profile privacy/block/delete/export endpoints, and broader security review
+remain before production readiness.

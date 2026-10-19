@@ -447,6 +447,95 @@ def test_expired_rate_limit_bucket_cleanup_retains_current_window() -> None:
     TEST_DATABASE_URL is None and os.environ.get("CI", "").lower() != "true",
     reason="Set TEST_DATABASE_URL to a migrated disposable PostgreSQL database",
 )
+def test_private_profile_update_validates_and_persists_display_name_and_interests() -> None:
+    assert TEST_DATABASE_URL is not None
+    email = f"profile-{uuid4().hex}@example.com"
+    password = "Profile-test-passphrase-2026!"
+    sender = FakeAuthEmailSender()
+
+    async def run() -> None:
+        async with api_client(sender, email) as (client, _app):
+            unauthorized = await client.get("/api/v1/profile/me")
+            assert unauthorized.status_code == 401
+
+            registered = await client.post(
+                "/api/v1/auth/register",
+                json={
+                    "email": email,
+                    "password": password,
+                    "display_name": "Profile User",
+                },
+            )
+            assert registered.status_code == 202
+            await client.post(
+                "/api/v1/auth/verify-email",
+                json={"token": sender.verification_tokens[-1][1]},
+            )
+            login = await client.post(
+                "/api/v1/auth/login",
+                json={"email": email, "password": password},
+            )
+            auth_headers = {
+                "Authorization": f"Bearer {login.json()['access_token']}",
+            }
+
+            initial = await client.get("/api/v1/profile/me", headers=auth_headers)
+            assert initial.status_code == 200
+            assert initial.json()["display_name"] == "Profile User"
+            assert initial.json()["interests"] == []
+            assert "email" not in initial.json()
+            assert "password_hash" not in initial.json()
+
+            updated = await client.patch(
+                "/api/v1/profile/me",
+                headers=auth_headers,
+                json={
+                    "display_name": "  Updated Profile  ",
+                    "interests": ["Exam prep", "Technology"],
+                },
+            )
+            assert updated.status_code == 200
+            assert updated.json()["display_name"] == "Updated Profile"
+            assert updated.json()["interests"] == ["Exam prep", "Technology"]
+
+            invalid_patches = [
+                {},
+                {"display_name": None},
+                {"interests": None},
+                {"display_name": "   "},
+                {"interests": ["Technology", " technology "]},
+                {"interests": [" "]},
+                {"interests": ["x" * 81]},
+                {"interests": [f"Topic {index}" for index in range(21)]},
+                {"unexpected_field": "must be rejected"},
+            ]
+            for payload in invalid_patches:
+                invalid = await client.patch(
+                    "/api/v1/profile/me",
+                    headers=auth_headers,
+                    json=payload,
+                )
+                assert invalid.status_code == 422, payload
+
+            unchanged = await client.get("/api/v1/profile/me", headers=auth_headers)
+            assert unchanged.json()["display_name"] == "Updated Profile"
+            assert unchanged.json()["interests"] == ["Exam prep", "Technology"]
+
+            cleared = await client.patch(
+                "/api/v1/profile/me",
+                headers=auth_headers,
+                json={"interests": []},
+            )
+            assert cleared.status_code == 200
+            assert cleared.json()["interests"] == []
+
+    asyncio.run(run())
+
+
+@pytest.mark.skipif(
+    TEST_DATABASE_URL is None and os.environ.get("CI", "").lower() != "true",
+    reason="Set TEST_DATABASE_URL to a migrated disposable PostgreSQL database",
+)
 def test_expired_verification_recovery_and_session_tokens_are_rejected() -> None:
     assert TEST_DATABASE_URL is not None
     email = f"expired-{uuid4().hex}@example.com"

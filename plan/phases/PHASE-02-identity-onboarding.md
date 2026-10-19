@@ -1,6 +1,6 @@
 # Phase 2 — Identity, onboarding, and profile APIs
 
-**Status:** In progress — the email/password identity API slice is implemented and integration-tested. Profile/account-control APIs remain; mobile mocks are frozen.
+**Status:** In progress — email/password identity and private self-profile APIs are implemented and integration-tested. Privacy/block/account-control APIs remain; mobile mocks are frozen.
 **Goal:** Implement and exhaustively test identity, session, profile, and
 account APIs before resuming their frontend work.
 
@@ -25,8 +25,10 @@ account APIs before resuming their frontend work.
   reset tokens.
 - Staging/production must provide `AUTH_RATE_LIMIT_SECRET` through their secret
   manager.
-- Confirm initial audience/age requirements, profile fields, interest taxonomy,
-  profile visibility, and account deletion/export rules.
+- Confirm initial audience/age requirements, public profile visibility,
+  curated interest taxonomy, privacy preferences, and account deletion/export
+  rules. The current private self-profile API intentionally exposes no profile
+  to other users.
 
 The approved authentication decision is recorded in
 `../../docs/decisions/0002-email-password-authentication.md`.
@@ -71,10 +73,14 @@ frontend work.
   the local SMTP path through Mailpit.
 - [x] Verify Alembic drift and run the complete database-backed suite with zero
   skipped tests.
+- [x] Add self-only profile read/update endpoints for display name and private
+  free-form interests, with transactional persistence and input limits.
+- [x] Test unauthenticated access, allowed updates, blank/duplicate/oversized
+  values, unknown fields, and interest clearing.
 - [x] Document copy/paste payloads and provide a PowerShell smoke script that
   exercises the full local auth journey without Swagger.
 - [x] Add a bounded rate-limit bucket cleanup command.
 - [ ] Schedule/monitor that cleanup and add durable email retry/outbox behavior
   before production hardening.
-- [ ] Implement profile read/update, privacy/block controls, and account
-  deletion/export endpoints.
+- [ ] Implement privacy controls, block controls, and account deletion/export
+  endpoints after their policy decisions are approved.
