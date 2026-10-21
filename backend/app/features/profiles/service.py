@@ -17,10 +17,7 @@ async def get_own_profile(
     session: AsyncSession,
     principal: AuthenticatedPrincipal,
 ) -> ProfileRead:
-    user = await session.scalar(select(User).where(User.id == principal.user.id).with_for_update())
-    if user is None:
-        raise ProfilePolicyError("The account is no longer available")
-
+    user = principal.user
     interest_rows = await session.scalars(
         select(UserInterest)
         .where(UserInterest.user_id == user.id)
@@ -38,7 +35,9 @@ async def update_own_profile(
     principal: AuthenticatedPrincipal,
     update: ProfileUpdate,
 ) -> ProfileRead:
-    user = principal.user
+    user = await session.scalar(select(User).where(User.id == principal.user.id).with_for_update())
+    if user is None:
+        raise ProfilePolicyError("The account is no longer available")
     if "display_name" in update.model_fields_set:
         user.display_name = update.display_name
 
