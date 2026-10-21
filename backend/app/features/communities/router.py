@@ -8,14 +8,16 @@ from app.features.auth.dependencies import AuthenticatedDependency
 from app.features.communities import service
 from app.features.communities.schemas import (
     CommunityCreate,
+    CommunityDetailRead,
     CommunityMembershipRead,
     CommunityPage,
     CommunityRead,
     CommunityUpdate,
 )
 from app.features.communities.service import (
+    CommunityForbidden,
+    CommunityNotFound,
     CommunityNotJoinable,
-    CommunityNotOwned,
     CommunityOwnerCannotLeave,
     CommunitySlugConflict,
 )
@@ -115,6 +117,10 @@ async def leave_community(
     "/{slug}/manage",
     response_model=CommunityRead,
     summary="Read a community owned by the current user",
+    responses={
+        403: {"description": "The authenticated user is not the community owner."},
+        404: {"description": "No community exists with this slug."},
+    },
 )
 async def get_owned_community(
     principal: AuthenticatedDependency,
@@ -124,13 +130,19 @@ async def get_owned_community(
         Path(min_length=1, max_length=140, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$"),
     ],
 ) -> CommunityRead:
-    community = await service.get_owned_community(
-        session,
-        slug=slug,
-        owner_id=principal.user.id,
-    )
-    if community is None:
-        raise HTTPException(status_code=404, detail="Community not found")
+    try:
+        community = await service.get_owned_community(
+            session,
+            slug=slug,
+            owner_id=principal.user.id,
+        )
+    except CommunityNotFound:
+        raise HTTPException(status_code=404, detail="Community not found") from None
+    except CommunityForbidden:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not authorized to manage this community.",
+        ) from None
     return CommunityRead.model_validate(community)
 
 
@@ -138,6 +150,10 @@ async def get_owned_community(
     "/{slug}",
     response_model=CommunityRead,
     summary="Update a community owned by the current user",
+    responses={
+        403: {"description": "The authenticated user is not the community owner."},
+        404: {"description": "No community exists with this slug."},
+    },
 )
 async def update_owned_community(
     data: CommunityUpdate,
@@ -155,8 +171,13 @@ async def update_owned_community(
             owner_id=principal.user.id,
             data=data,
         )
-    except CommunityNotOwned:
+    except CommunityNotFound:
         raise HTTPException(status_code=404, detail="Community not found") from None
+    except CommunityForbidden:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not authorized to manage this community.",
+        ) from None
     return CommunityRead.model_validate(community)
 
 
@@ -200,14 +221,20 @@ async def get_communities(
 
 @router.get(
     "/{slug}",
-    response_model=CommunityRead,
+    response_model=CommunityDetailRead,
     summary="Read a public community preview",
+    responses={404: {"description": "Community is unknown, private, or expired."}},
 )
 async def get_community(
     session: DatabaseSession,
     slug: Annotated[str, Path(min_length=1, max_length=140, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")],
-) -> CommunityRead:
-    community = await service.get_public_community(session, slug=slug)
-    if community is None:
+) -> CommunityDetailRead:
+    community_details = await service.get_public_community_with_member_count(
+        session,
+        slug=slug,
+    )
+    if community_details is None:
         raise HTTPException(status_code=404, detail="Community not found")
-    return CommunityRead.model_validate(community)
+    community, member_count = community_details
+    public_fields = CommunityRead.model_validate(community).model_dump()
+    return CommunityDetailRead(**public_fields, member_count=member_count)

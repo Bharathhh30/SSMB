@@ -207,25 +207,31 @@ def test_public_community_detail_returns_a_safe_preview() -> None:
         created_at=datetime.now(UTC),
     )
     session = AsyncMock(spec=AsyncSession)
-    session.scalar.return_value = community
+    query_result = MagicMock()
+    query_result.one_or_none.return_value = (community, 7)
+    session.execute.return_value = query_result
 
     response = get(make_test_app(session), "/api/v1/communities/gate-quant-lab")
 
     assert response.status_code == 200
     assert response.json()["slug"] == "gate-quant-lab"
     assert response.json()["access_type"] == "open"
+    assert response.json()["member_count"] == 7
     assert "owner_id" not in response.json()
-    session.scalar.assert_awaited_once()
+    session.execute.assert_awaited_once()
 
 
 def test_private_or_unknown_community_detail_is_not_disclosed() -> None:
     session = AsyncMock(spec=AsyncSession)
-    session.scalar.return_value = None
+    query_result = MagicMock()
+    query_result.one_or_none.return_value = None
+    session.execute.return_value = query_result
 
     response = get(make_test_app(session), "/api/v1/communities/private-circle")
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Community not found"}
+    session.execute.assert_awaited_once()
 
 
 @pytest.mark.parametrize(
@@ -249,12 +255,14 @@ def test_community_detail_rejects_invalid_slugs(slug: str) -> None:
 
 def test_community_detail_accepts_maximum_length_slug() -> None:
     session = AsyncMock(spec=AsyncSession)
-    session.scalar.return_value = None
+    query_result = MagicMock()
+    query_result.one_or_none.return_value = None
+    session.execute.return_value = query_result
 
     response = get(make_test_app(session), f"/api/v1/communities/{'a' * 140}")
 
     assert response.status_code == 404
-    session.scalar.assert_awaited_once()
+    session.execute.assert_awaited_once()
 
 
 def test_community_creation_requires_authentication() -> None:

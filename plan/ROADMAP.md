@@ -425,7 +425,11 @@ communities remain hidden from non-member join/leave attempts, and owners cannot
 leave before ownership transfer exists. Migration SQL was reviewed; upgrade
 from `0004` backfilled a pre-existing founder, downgrade/re-upgrade succeeded,
 and Alembic reported no model drift. The community creation/join/leave/owner
-management slice passed 91/91 tests against an isolated PostgreSQL 18 cluster
-with zero skips. Phase 3 remains in progress; archive behavior, invites,
-moderator controls, ownership transfer, and remaining access/privacy contracts
-are not yet implemented. No mobile files were changed.
+and Alembic reported no model drift. Public community detail includes member
+count without exposing identities. Management routes distinguish authenticated
+non-owner `403` responses from unknown-community `404` responses and document
+those outcomes. The expanded suite passed 91/91 tests against an isolated
+PostgreSQL 18 cluster with zero skips, including exact count and
+owner/non-owner/unknown status cases. Phase 3 remains in progress; archive
+behavior, invites, moderator controls, ownership transfer, and remaining
+access/privacy contracts are not yet implemented. No mobile files were changed.

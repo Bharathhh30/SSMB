@@ -58,6 +58,10 @@ frontend implementation before backend completion.
   attempts; prevent the owner from leaving before ownership transfer exists.
 - [x] Add owner-only management read and metadata update; preserve community
   slugs when names change and allow owners to clear an optional expiry.
+- [x] Include the current owner/moderator/member total in the public community
+  detail response without exposing member identities.
+- [x] Distinguish authenticated management denial (`403`) from a missing
+  community (`404`) and document response meanings in OpenAPI.
 - [ ] Define archive/deletion semantics before implementing lifecycle actions.
 - [ ] Implement invite lifecycle, moderator roles, ownership transfer, and
   private member-roster access rules.

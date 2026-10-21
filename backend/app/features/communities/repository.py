@@ -75,6 +75,26 @@ async def get_public_community(session: AsyncSession, *, slug: str) -> Community
     return await session.scalar(statement)
 
 
+async def get_public_community_with_member_count(
+    session: AsyncSession,
+    *,
+    slug: str,
+) -> tuple[Community, int] | None:
+    now = datetime.now(UTC)
+    member_count = (
+        select(func.count(CommunityMembership.id))
+        .where(CommunityMembership.community_id == Community.id)
+        .scalar_subquery()
+    )
+    statement = select(Community, member_count.label("member_count")).where(
+        Community.slug == slug,
+        Community.access_type == "open",
+        or_(Community.expires_at.is_(None), Community.expires_at > now),
+    )
+    row = (await session.execute(statement)).one_or_none()
+    return (row[0], row[1]) if row is not None else None
+
+
 async def community_slug_exists(session: AsyncSession, *, slug: str) -> bool:
     return bool(await session.scalar(select(Community.id).where(Community.slug == slug)))
 
@@ -143,13 +163,9 @@ async def get_owned_community(
     session: AsyncSession,
     *,
     slug: str,
-    owner_id: UUID,
     for_update: bool = False,
 ) -> Community | None:
-    statement = select(Community).where(
-        Community.slug == slug,
-        Community.owner_id == owner_id,
-    )
+    statement = select(Community).where(Community.slug == slug)
     if for_update:
         statement = statement.with_for_update()
     return await session.scalar(statement)

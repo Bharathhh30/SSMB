@@ -37,6 +37,13 @@ class CommunityMembershipRead(BaseModel):
     joined_at: datetime
 
 
+class CommunityDetailRead(CommunityRead):
+    member_count: int = Field(
+        ge=0,
+        description="Current memberships, including the owner and moderators.",
+    )
+
+
 class CommunityCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

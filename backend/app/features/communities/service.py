@@ -23,12 +23,20 @@ class CommunityOwnerCannotLeave(Exception):
     """The owner must transfer ownership before leaving their community."""
 
 
-class CommunityNotOwned(Exception):
-    """The community does not exist or is not owned by the caller."""
+class CommunityNotFound(Exception):
+    """No community exists for the requested slug."""
 
 
-async def get_public_community(session: AsyncSession, *, slug: str) -> Community | None:
-    return await repository.get_public_community(session, slug=slug)
+class CommunityForbidden(Exception):
+    """The authenticated caller is not allowed to manage the community."""
+
+
+async def get_public_community_with_member_count(
+    session: AsyncSession,
+    *,
+    slug: str,
+) -> tuple[Community, int] | None:
+    return await repository.get_public_community_with_member_count(session, slug=slug)
 
 
 async def discover_communities(
@@ -155,8 +163,13 @@ async def get_owned_community(
     *,
     slug: str,
     owner_id: UUID,
-) -> Community | None:
-    return await repository.get_owned_community(session, slug=slug, owner_id=owner_id)
+) -> Community:
+    community = await repository.get_owned_community(session, slug=slug)
+    if community is None:
+        raise CommunityNotFound
+    if community.owner_id != owner_id:
+        raise CommunityForbidden
+    return community
 
 
 async def update_owned_community(
@@ -169,12 +182,14 @@ async def update_owned_community(
     community = await repository.get_owned_community(
         session,
         slug=slug,
-        owner_id=owner_id,
         for_update=True,
     )
     if community is None:
         await session.rollback()
-        raise CommunityNotOwned
+        raise CommunityNotFound
+    if community.owner_id != owner_id:
+        await session.rollback()
+        raise CommunityForbidden
 
     for field in data.model_fields_set:
         setattr(community, field, getattr(data, field))

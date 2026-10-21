@@ -19,6 +19,8 @@ The same endpoints can be called from a terminal with `curl.exe`.
 
 Expected: `201 Created`, with a generated URL-safe `slug`. Save that slug for
 the membership examples. The first creator is persisted as the `owner`.
+The public preview endpoint returns `member_count`, including the owner and any
+moderators or members.
 
 ## Create an invite-only community
 
@@ -70,6 +72,7 @@ verified account. Neither request has a JSON body.
 
 The slug remains unchanged when the display name changes. `expires_at: null`
 clears an existing expiry; if set to a timestamp, it must include a timezone
-and be in the future. Empty patches, explicit nulls for name/topic/description/
-access type, and edits by non-owners are rejected (`422` for invalid input;
-`404` for non-owner or unknown community).
+and be in the future. Empty patches and explicit nulls for name/topic/
+description/access type return `422`. Authenticated non-owners receive
+`403 Forbidden` with a clear authorization message; unknown slugs return
+`404 Not Found`. A `403` response never includes private community data.

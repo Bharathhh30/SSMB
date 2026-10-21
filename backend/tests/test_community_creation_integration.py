@@ -85,6 +85,9 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
                     assert first.status_code == 201
                     first_data = first.json()
                     created_ids.append(UUID(first_data["id"]))
+                    initial_public_preview = await client.get(
+                        f"/api/v1/communities/{first_data['slug']}"
+                    )
                     second = await client.post(
                         "/api/v1/communities",
                         json={
@@ -116,8 +119,18 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
                     rejoin = await client.post(
                         f"/api/v1/communities/study-circle-{suffix[:8]}/join"
                     )
+                    joined_public_preview = await client.get(
+                        f"/api/v1/communities/study-circle-{suffix[:8]}"
+                    )
                     expired_join = await client.post(f"/api/v1/communities/expired-{suffix}/join")
                     active_user_id["value"] = owner_id
+                    unknown_owner_view = await client.get(
+                        "/api/v1/communities/unknown-community/manage"
+                    )
+                    unknown_owner_edit = await client.patch(
+                        "/api/v1/communities/unknown-community",
+                        json={"name": "No such community"},
+                    )
                     owner_leave = await client.delete(
                         f"/api/v1/communities/study-circle-{suffix[:8]}/leave"
                     )
@@ -148,6 +161,8 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
 
             assert first.status_code == 201
             assert second.status_code == 201
+            assert initial_public_preview.status_code == 200
+            assert initial_public_preview.json()["member_count"] == 1
             assert first_data["slug"] == f"study-circle-{suffix[:8]}"
             assert second_data["slug"].startswith(f"study-circle-{suffix[:8]}-")
             assert first_data["slug"] != second_data["slug"]
@@ -166,13 +181,25 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
             assert private_leave.status_code == 404
             assert first_leave.status_code == repeated_leave.status_code == 204
             assert rejoin.status_code == 201
+            assert joined_public_preview.status_code == 200
+            assert joined_public_preview.json()["member_count"] == 2
             assert expired_join.status_code == 404
+            assert unknown_owner_view.status_code == 404
+            assert unknown_owner_view.json() == {"detail": "Community not found"}
+            assert unknown_owner_edit.status_code == 404
+            assert unknown_owner_edit.json() == {"detail": "Community not found"}
             assert owner_leave.status_code == 409
             assert private_owner_view.status_code == 200
             assert private_owner_view.json()["access_type"] == "invite_only"
             assert private_public_view.status_code == 404
-            assert member_owner_view.status_code == 404
-            assert member_edit.status_code == 404
+            assert member_owner_view.status_code == 403
+            assert member_owner_view.json() == {
+                "detail": "You are not authorized to manage this community."
+            }
+            assert member_edit.status_code == 403
+            assert member_edit.json() == {
+                "detail": "You are not authorized to manage this community."
+            }
             assert owner_edit.status_code == 200
             assert owner_edit.json()["name"] == f"Renamed Circle {suffix[:8]}"
             assert owner_edit.json()["topic"] == "Updated biology"
