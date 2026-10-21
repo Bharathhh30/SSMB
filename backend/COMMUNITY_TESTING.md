@@ -51,3 +51,25 @@ Replace `{slug}` with the slug returned by the create endpoint:
 
 Both membership endpoints require a valid, non-revoked access token from a
 verified account. Neither request has a JSON body.
+
+## Read and update your community
+
+- `GET /api/v1/communities/{slug}/manage` returns a community only to its owner,
+  including an invite-only community that is hidden from public preview.
+- `PATCH /api/v1/communities/{slug}` updates only fields supplied in the body.
+  For example:
+
+```json
+{
+  "name": "GATE Study Circle — Updated",
+  "topic": "GATE preparation",
+  "description": "Updated community details.",
+  "expires_at": null
+}
+```
+
+The slug remains unchanged when the display name changes. `expires_at: null`
+clears an existing expiry; if set to a timestamp, it must include a timezone
+and be in the future. Empty patches, explicit nulls for name/topic/description/
+access type, and edits by non-owners are rejected (`422` for invalid input;
+`404` for non-owner or unknown community).

@@ -90,6 +90,8 @@ reason rather than silently omitting it.
 | `POST /api/v1/communities` | Verified signed-in user creates an `open` or `invite_only` community; creator receives owner membership; slug is generated from the name | Anonymous/revoked session, invalid/blank/oversized fields, timezone-less/past expiry, extra fields, duplicate names/slugs, transaction atomicity, response allowlist |
 | `POST /api/v1/communities/{slug}/join` | Authenticated user joins an active open community; retries return the existing membership | Anonymous, invalid/unknown/private/expired slug, duplicate/concurrent joins, unique membership constraint, response allowlist |
 | `DELETE /api/v1/communities/{slug}/leave` | Authenticated member leaves; repeated leave from an active open community is idempotent; owner must transfer ownership first | Anonymous, unknown/private non-member, expired community, owner denial, repeated/concurrent leave, transaction consistency |
+| `GET /api/v1/communities/{slug}/manage` | Community owner reads their community, including invite-only or expired records | Anonymous, unknown slug, cross-owner access, owner/private-field response allowlist |
+| `PATCH /api/v1/communities/{slug}` | Owner updates name, topic, description, access type, or expiry; slug remains stable | Anonymous, non-owner/member, blank/null/oversized fields, empty patch, extra fields, invalid expiry, explicit expiry clear, concurrent writes |
 | `GET /api/v1/profile/me` | Authenticated caller's display name and private interests only | Missing/expired/revoked auth, no email/hash leakage, empty interests |
 | `PATCH /api/v1/profile/me` | Update caller's display name; add/remove private interests | Blank/null/unknown/oversized/duplicate values, atomic add/remove behavior, clearing interests |
 

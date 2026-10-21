@@ -11,9 +11,11 @@ from app.features.communities.schemas import (
     CommunityMembershipRead,
     CommunityPage,
     CommunityRead,
+    CommunityUpdate,
 )
 from app.features.communities.service import (
     CommunityNotJoinable,
+    CommunityNotOwned,
     CommunityOwnerCannotLeave,
     CommunitySlugConflict,
 )
@@ -107,6 +109,55 @@ async def leave_community(
             detail="Transfer community ownership before leaving",
         ) from None
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/{slug}/manage",
+    response_model=CommunityRead,
+    summary="Read a community owned by the current user",
+)
+async def get_owned_community(
+    principal: AuthenticatedDependency,
+    session: DatabaseSession,
+    slug: Annotated[
+        str,
+        Path(min_length=1, max_length=140, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$"),
+    ],
+) -> CommunityRead:
+    community = await service.get_owned_community(
+        session,
+        slug=slug,
+        owner_id=principal.user.id,
+    )
+    if community is None:
+        raise HTTPException(status_code=404, detail="Community not found")
+    return CommunityRead.model_validate(community)
+
+
+@router.patch(
+    "/{slug}",
+    response_model=CommunityRead,
+    summary="Update a community owned by the current user",
+)
+async def update_owned_community(
+    data: CommunityUpdate,
+    principal: AuthenticatedDependency,
+    session: DatabaseSession,
+    slug: Annotated[
+        str,
+        Path(min_length=1, max_length=140, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$"),
+    ],
+) -> CommunityRead:
+    try:
+        community = await service.update_owned_community(
+            session,
+            slug=slug,
+            owner_id=principal.user.id,
+            data=data,
+        )
+    except CommunityNotOwned:
+        raise HTTPException(status_code=404, detail="Community not found") from None
+    return CommunityRead.model_validate(community)
 
 
 @router.get(

@@ -24,7 +24,7 @@ TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
     TEST_DATABASE_URL is None and os.environ.get("CI", "").lower() != "true",
     reason="Set TEST_DATABASE_URL to a migrated disposable PostgreSQL database",
 )
-def test_community_creation_join_leave_and_unique_membership_are_atomic() -> None:
+def test_community_creation_membership_and_owner_controls_are_authorized() -> None:
     assert TEST_DATABASE_URL is not None
 
     async def run() -> None:
@@ -79,6 +79,7 @@ def test_community_creation_join_leave_and_unique_membership_are_atomic() -> Non
                             "name": f"Study Circle {suffix[:8]}",
                             "topic": "Biology",
                             "access_type": "open",
+                            "expires_at": "2030-01-01T00:00:00Z",
                         },
                     )
                     assert first.status_code == 201
@@ -120,6 +121,30 @@ def test_community_creation_join_leave_and_unique_membership_are_atomic() -> Non
                     owner_leave = await client.delete(
                         f"/api/v1/communities/study-circle-{suffix[:8]}/leave"
                     )
+                    private_owner_view = await client.get(
+                        f"/api/v1/communities/{second_data['slug']}/manage"
+                    )
+                    private_public_view = await client.get(
+                        f"/api/v1/communities/{second_data['slug']}"
+                    )
+                    active_user_id["value"] = joiner_id
+                    member_owner_view = await client.get(
+                        f"/api/v1/communities/study-circle-{suffix[:8]}/manage"
+                    )
+                    member_edit = await client.patch(
+                        f"/api/v1/communities/study-circle-{suffix[:8]}",
+                        json={"name": "Unauthorized rename"},
+                    )
+                    active_user_id["value"] = owner_id
+                    owner_edit = await client.patch(
+                        f"/api/v1/communities/study-circle-{suffix[:8]}",
+                        json={
+                            "name": f"Renamed Circle {suffix[:8]}",
+                            "topic": "Updated biology",
+                            "description": "Updated description",
+                            "expires_at": None,
+                        },
+                    )
 
             assert first.status_code == 201
             assert second.status_code == 201
@@ -143,6 +168,17 @@ def test_community_creation_join_leave_and_unique_membership_are_atomic() -> Non
             assert rejoin.status_code == 201
             assert expired_join.status_code == 404
             assert owner_leave.status_code == 409
+            assert private_owner_view.status_code == 200
+            assert private_owner_view.json()["access_type"] == "invite_only"
+            assert private_public_view.status_code == 404
+            assert member_owner_view.status_code == 404
+            assert member_edit.status_code == 404
+            assert owner_edit.status_code == 200
+            assert owner_edit.json()["name"] == f"Renamed Circle {suffix[:8]}"
+            assert owner_edit.json()["topic"] == "Updated biology"
+            assert owner_edit.json()["description"] == "Updated description"
+            assert owner_edit.json()["expires_at"] is None
+            assert owner_edit.json()["slug"] == first_data["slug"]
 
             async with session_factory() as session:
                 memberships = await session.scalars(

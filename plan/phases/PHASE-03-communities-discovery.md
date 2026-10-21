@@ -1,6 +1,6 @@
 # Phase 3 — Communities, discovery, access, and roles
 
-**Status:** In progress — public discovery, authenticated community creation, founder membership, and open-community join/leave are implemented and PostgreSQL-tested. Invites, management, and role actions remain.
+**Status:** In progress — public discovery, authenticated community creation, open-community join/leave, and owner read/update are implemented and PostgreSQL-tested. Archiving, invites, and role actions remain.
 **Goal:** Make the core discover → join → participate journey work with enforceable community access rules.
 
 ## Backend-first sequencing
@@ -56,7 +56,9 @@ frontend implementation before backend completion.
   membership uniqueness constraint in PostgreSQL.
 - [x] Hide invite-only and expired communities from non-member join/leave
   attempts; prevent the owner from leaving before ownership transfer exists.
-- [ ] Implement owner read/update/archive controls.
+- [x] Add owner-only management read and metadata update; preserve community
+  slugs when names change and allow owners to clear an optional expiry.
+- [ ] Define archive/deletion semantics before implementing lifecycle actions.
 - [ ] Implement invite lifecycle, moderator roles, ownership transfer, and
   private member-roster access rules.
 

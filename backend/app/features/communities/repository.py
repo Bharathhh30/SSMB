@@ -139,6 +139,22 @@ async def get_community_by_slug_for_leave(
     return await session.scalar(statement)
 
 
+async def get_owned_community(
+    session: AsyncSession,
+    *,
+    slug: str,
+    owner_id: UUID,
+    for_update: bool = False,
+) -> Community | None:
+    statement = select(Community).where(
+        Community.slug == slug,
+        Community.owner_id == owner_id,
+    )
+    if for_update:
+        statement = statement.with_for_update()
+    return await session.scalar(statement)
+
+
 async def get_membership(
     session: AsyncSession,
     *,

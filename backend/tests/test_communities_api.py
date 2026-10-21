@@ -52,6 +52,14 @@ async def delete_path(app: FastAPI, path: str) -> Response:
         return await client.delete(path)
 
 
+async def patch_json(app: FastAPI, path: str, payload: dict[str, object]) -> Response:
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        return await client.patch(path, json=payload)
+
+
 def get(app: FastAPI, path: str) -> Response:
     return asyncio.run(request(app, path))
 
@@ -62,6 +70,10 @@ def post(app: FastAPI, path: str, payload: dict[str, object]) -> Response:
 
 def delete(app: FastAPI, path: str) -> Response:
     return asyncio.run(delete_path(app, path))
+
+
+def patch(app: FastAPI, path: str, payload: dict[str, object]) -> Response:
+    return asyncio.run(patch_json(app, path, payload))
 
 
 def test_discover_communities_returns_a_bounded_page() -> None:
@@ -278,6 +290,22 @@ def test_membership_changes_require_authentication(method: str, path: str) -> No
     session.add_all.assert_not_called()
 
 
+def test_owner_management_requires_authentication() -> None:
+    session = AsyncMock(spec=AsyncSession)
+    app = make_test_app(session)
+
+    read = get(app, "/api/v1/communities/study-circle/manage")
+    update = patch(
+        app,
+        "/api/v1/communities/study-circle",
+        {"name": "Updated study circle"},
+    )
+
+    assert read.status_code == update.status_code == 401
+    assert read.json() == update.json() == {"detail": "Authentication required"}
+    session.scalar.assert_not_awaited()
+
+
 def test_community_creation_returns_only_public_fields(monkeypatch: pytest.MonkeyPatch) -> None:
     owner_id = uuid4()
     community = Community(
@@ -401,6 +429,85 @@ def test_community_creation_hides_slug_conflict_details(monkeypatch: pytest.Monk
 
     assert response.status_code == 409
     assert response.json() == {"detail": "A community URL conflict occurred. Please retry."}
+
+
+def test_owner_can_read_and_update_community_without_changing_its_slug(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner_id = uuid4()
+    community = Community(
+        id=uuid4(),
+        owner_id=owner_id,
+        name="Study Circle",
+        slug="study-circle",
+        topic="Biology",
+        description="Original description",
+        access_type="open",
+        expires_at=None,
+        created_at=datetime.now(UTC),
+    )
+    session = AsyncMock(spec=AsyncSession)
+    app = make_test_app(session)
+    app.dependency_overrides[require_authenticated_principal] = lambda: SimpleNamespace(
+        user=SimpleNamespace(id=owner_id)
+    )
+    get_owned = AsyncMock(return_value=community)
+    update_owned = AsyncMock(return_value=community)
+    monkeypatch.setattr(community_service, "get_owned_community", get_owned)
+    monkeypatch.setattr(community_service, "update_owned_community", update_owned)
+
+    managed = get(app, "/api/v1/communities/study-circle/manage")
+    updated = patch(
+        app,
+        "/api/v1/communities/study-circle",
+        {
+            "name": "  Updated Study Circle ",
+            "description": " Updated description ",
+            "expires_at": None,
+        },
+    )
+
+    assert managed.status_code == 200
+    assert managed.json()["slug"] == "study-circle"
+    assert "owner_id" not in managed.json()
+    assert updated.status_code == 200
+    assert update_owned.await_args.kwargs["owner_id"] == owner_id
+    update_data = update_owned.await_args.kwargs["data"]
+    assert update_data.name == "Updated Study Circle"
+    assert update_data.description == "Updated description"
+    assert "expires_at" in update_data.model_fields_set
+    assert update_data.expires_at is None
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"name": None},
+        {"topic": None},
+        {"description": None},
+        {"access_type": None},
+        {"name": " "},
+        {"name": "n" * 121},
+        {"topic": "t" * 81},
+        {"description": "d" * 5001},
+        {"access_type": "public"},
+        {"expires_at": "2030-01-01T00:00:00"},
+        {"expires_at": "2020-01-01T00:00:00Z"},
+        {"unexpected": "field"},
+    ],
+)
+def test_owner_update_rejects_invalid_patch_payloads(payload: dict[str, object]) -> None:
+    session = AsyncMock(spec=AsyncSession)
+    app = make_test_app(session)
+    app.dependency_overrides[require_authenticated_principal] = lambda: SimpleNamespace(
+        user=SimpleNamespace(id=uuid4())
+    )
+
+    response = patch(app, "/api/v1/communities/study-circle", payload)
+
+    assert response.status_code == 422
+    session.execute.assert_not_awaited()
 
 
 def test_community_creation_rejects_expired_timestamp() -> None:

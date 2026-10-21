@@ -347,9 +347,9 @@ Its available topic filters now come from `GET /api/v1/topics`, which
 lists distinct topics with active open communities; Home and Discover handle
 topic loading/failure without blocking the all-communities view. The API
 intentionally does not return invite-only communities until a
-public-preview policy is decided. Selecting an open community shows an API-backed
-preview; join/create, membership, and role actions remain out of scope until
-identity and access decisions are complete. The development seed command is
+public-preview policy is decided. The backend now supports community creation,
+open join/leave, and owner-only metadata management; the Expo prototype remains
+frozen until the Backend Completion Gate. The development seed command is
 explicit and refuses to run outside `APP_ENV=development`.
 
 The first GitHub Actions run is complete. Its backend/PostgreSQL job passed the
@@ -424,7 +424,8 @@ uniqueness protect concurrent membership changes. Invite-only and expired
 communities remain hidden from non-member join/leave attempts, and owners cannot
 leave before ownership transfer exists. Migration SQL was reviewed; upgrade
 from `0004` backfilled a pre-existing founder, downgrade/re-upgrade succeeded,
-and Alembic reported no model drift. The full suite passed 76/76 against an
-isolated PostgreSQL 18 cluster with zero skips. Phase 3 remains in progress;
-owner management, invites, moderator controls, and remaining access/privacy
-contracts are not yet implemented. No mobile files were changed.
+and Alembic reported no model drift. The community creation/join/leave/owner
+management slice passed 91/91 tests against an isolated PostgreSQL 18 cluster
+with zero skips. Phase 3 remains in progress; archive behavior, invites,
+moderator controls, ownership transfer, and remaining access/privacy contracts
+are not yet implemented. No mobile files were changed.

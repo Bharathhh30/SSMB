@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.communities import repository
 from app.features.communities.models import Community, CommunityMembership
-from app.features.communities.schemas import CommunityCreate
+from app.features.communities.schemas import CommunityCreate, CommunityUpdate
 
 
 class CommunitySlugConflict(Exception):
@@ -21,6 +21,10 @@ class CommunityNotJoinable(Exception):
 
 class CommunityOwnerCannotLeave(Exception):
     """The owner must transfer ownership before leaving their community."""
+
+
+class CommunityNotOwned(Exception):
+    """The community does not exist or is not owned by the caller."""
 
 
 async def get_public_community(session: AsyncSession, *, slug: str) -> Community | None:
@@ -144,6 +148,38 @@ async def leave_community(
 
     await repository.delete_membership(session, membership)
     await session.commit()
+
+
+async def get_owned_community(
+    session: AsyncSession,
+    *,
+    slug: str,
+    owner_id: UUID,
+) -> Community | None:
+    return await repository.get_owned_community(session, slug=slug, owner_id=owner_id)
+
+
+async def update_owned_community(
+    session: AsyncSession,
+    *,
+    slug: str,
+    owner_id: UUID,
+    data: CommunityUpdate,
+) -> Community:
+    community = await repository.get_owned_community(
+        session,
+        slug=slug,
+        owner_id=owner_id,
+        for_update=True,
+    )
+    if community is None:
+        await session.rollback()
+        raise CommunityNotOwned
+
+    for field in data.model_fields_set:
+        setattr(community, field, getattr(data, field))
+    await session.commit()
+    return community
 
 
 def _slugify(value: str) -> str:
