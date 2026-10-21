@@ -1,6 +1,6 @@
 # Phase 3 — Communities, discovery, access, and roles
 
-**Status:** In progress — public discovery is implemented; authenticated community creation and founder membership are implemented and PostgreSQL-tested. Join/leave, invites, management, and role actions remain.
+**Status:** In progress — public discovery, authenticated community creation, founder membership, and open-community join/leave are implemented and PostgreSQL-tested. Invites, management, and role actions remain.
 **Goal:** Make the core discover → join → participate journey work with enforceable community access rules.
 
 ## Backend-first sequencing
@@ -51,7 +51,12 @@ frontend implementation before backend completion.
 - [x] Return an allowlisted community response without exposing the owner ID.
 - [x] Test anonymous requests, request validation boundaries, duplicate-name
   slugs, and persisted founder membership against PostgreSQL.
-- [ ] Implement owner read/update/archive controls and member join/leave APIs.
+- [x] Implement idempotent joins for active open communities and member leave;
+  serialize concurrent joins using a community row lock and enforce the
+  membership uniqueness constraint in PostgreSQL.
+- [x] Hide invite-only and expired communities from non-member join/leave
+  attempts; prevent the owner from leaving before ownership transfer exists.
+- [ ] Implement owner read/update/archive controls.
 - [ ] Implement invite lifecycle, moderator roles, ownership transfer, and
   private member-roster access rules.
 
@@ -59,3 +64,7 @@ The first creation slice deliberately does not decide invite-link lifetime,
 community deletion/archive semantics, access requests, moderator capabilities,
 or private roster visibility. Those remain explicit policy/contract work for
 their respective endpoint slices.
+
+Open membership is available immediately. Invite-only communities may be
+created, but additional members cannot join until invite creation, revocation,
+and acceptance endpoints are implemented.

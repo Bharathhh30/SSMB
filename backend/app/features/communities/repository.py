@@ -105,7 +105,72 @@ async def create_community(
         community_id=community.id,
         user_id=owner_id,
         role="owner",
+        joined_at=datetime.now(UTC),
     )
     session.add_all([community, founder_membership])
     await session.flush()
     return community
+
+
+async def get_joinable_community(
+    session: AsyncSession,
+    *,
+    slug: str,
+    now: datetime,
+) -> Community | None:
+    statement = (
+        select(Community)
+        .where(
+            Community.slug == slug,
+            Community.access_type == "open",
+            or_(Community.expires_at.is_(None), Community.expires_at > now),
+        )
+        .with_for_update()
+    )
+    return await session.scalar(statement)
+
+
+async def get_community_by_slug_for_leave(
+    session: AsyncSession,
+    *,
+    slug: str,
+) -> Community | None:
+    statement = select(Community).where(Community.slug == slug).with_for_update()
+    return await session.scalar(statement)
+
+
+async def get_membership(
+    session: AsyncSession,
+    *,
+    community_id: UUID,
+    user_id: UUID,
+) -> CommunityMembership | None:
+    return await session.scalar(
+        select(CommunityMembership).where(
+            CommunityMembership.community_id == community_id,
+            CommunityMembership.user_id == user_id,
+        )
+    )
+
+
+async def add_member(
+    session: AsyncSession,
+    *,
+    community_id: UUID,
+    user_id: UUID,
+) -> CommunityMembership:
+    membership = CommunityMembership(
+        id=uuid4(),
+        community_id=community_id,
+        user_id=user_id,
+        role="member",
+        joined_at=datetime.now(UTC),
+    )
+    session.add(membership)
+    await session.flush()
+    return membership
+
+
+async def delete_membership(session: AsyncSession, membership: CommunityMembership) -> None:
+    await session.delete(membership)
+    await session.flush()

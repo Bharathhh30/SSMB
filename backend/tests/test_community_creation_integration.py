@@ -1,7 +1,8 @@
 import asyncio
 import os
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -23,18 +24,38 @@ TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
     TEST_DATABASE_URL is None and os.environ.get("CI", "").lower() != "true",
     reason="Set TEST_DATABASE_URL to a migrated disposable PostgreSQL database",
 )
-def test_creator_is_persisted_as_owner_and_duplicate_names_get_unique_slugs() -> None:
+def test_community_creation_join_leave_and_unique_membership_are_atomic() -> None:
     assert TEST_DATABASE_URL is not None
 
     async def run() -> None:
         owner_id = uuid4()
-        created_ids = []
+        joiner_id = uuid4()
+        created_ids: list[UUID] = []
+        expired_community_id = uuid4()
+        suffix = uuid4().hex
         engine = create_async_engine(TEST_DATABASE_URL)
         session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
         try:
             async with session_factory() as session:
-                session.add(User(id=owner_id, display_name="Community creator"))
+                session.add_all(
+                    [
+                        User(id=owner_id, display_name="Community creator"),
+                        User(id=joiner_id, display_name="Community joiner"),
+                    ]
+                )
+                await session.flush()
+                session.add(
+                    Community(
+                        id=expired_community_id,
+                        owner_id=owner_id,
+                        name="Expired community",
+                        slug=f"expired-{suffix}",
+                        topic="Testing",
+                        access_type="open",
+                        expires_at=datetime.now(UTC) - timedelta(minutes=1),
+                    )
+                )
                 await session.commit()
 
             settings = Settings(
@@ -42,8 +63,9 @@ def test_creator_is_persisted_as_owner_and_duplicate_names_get_unique_slugs() ->
                 database_url=SecretStr(TEST_DATABASE_URL),
             )
             app = create_app(settings)
+            active_user_id = {"value": owner_id}
             app.dependency_overrides[require_authenticated_principal] = lambda: SimpleNamespace(
-                user=SimpleNamespace(id=owner_id)
+                user=SimpleNamespace(id=active_user_id["value"])
             )
 
             async with app.router.lifespan_context(app):
@@ -54,30 +76,73 @@ def test_creator_is_persisted_as_owner_and_duplicate_names_get_unique_slugs() ->
                     first = await client.post(
                         "/api/v1/communities",
                         json={
-                            "name": "Study Circle",
+                            "name": f"Study Circle {suffix[:8]}",
                             "topic": "Biology",
                             "access_type": "open",
                         },
                     )
+                    assert first.status_code == 201
+                    first_data = first.json()
+                    created_ids.append(UUID(first_data["id"]))
                     second = await client.post(
                         "/api/v1/communities",
                         json={
-                            "name": "Study Circle",
+                            "name": f"Study Circle {suffix[:8]}",
                             "topic": "Biology",
                             "access_type": "invite_only",
                         },
                     )
+                    assert second.status_code == 201
+                    second_data = second.json()
+                    created_ids.append(UUID(second_data["id"]))
+                    active_user_id["value"] = joiner_id
+                    concurrent_joins = await asyncio.gather(
+                        client.post(f"/api/v1/communities/study-circle-{suffix[:8]}/join"),
+                        client.post(f"/api/v1/communities/study-circle-{suffix[:8]}/join"),
+                    )
+                    private_join = await client.post(
+                        f"/api/v1/communities/{second.json()['slug']}/join"
+                    )
+                    private_leave = await client.delete(
+                        f"/api/v1/communities/{second.json()['slug']}/leave"
+                    )
+                    first_leave = await client.delete(
+                        f"/api/v1/communities/study-circle-{suffix[:8]}/leave"
+                    )
+                    repeated_leave = await client.delete(
+                        f"/api/v1/communities/study-circle-{suffix[:8]}/leave"
+                    )
+                    rejoin = await client.post(
+                        f"/api/v1/communities/study-circle-{suffix[:8]}/join"
+                    )
+                    expired_join = await client.post(f"/api/v1/communities/expired-{suffix}/join")
+                    active_user_id["value"] = owner_id
+                    owner_leave = await client.delete(
+                        f"/api/v1/communities/study-circle-{suffix[:8]}/leave"
+                    )
 
             assert first.status_code == 201
             assert second.status_code == 201
-            first_data = first.json()
-            second_data = second.json()
-            created_ids.extend([first_data["id"], second_data["id"]])
-            assert first_data["slug"] == "study-circle"
-            assert second_data["slug"].startswith("study-circle-")
+            assert first_data["slug"] == f"study-circle-{suffix[:8]}"
+            assert second_data["slug"].startswith(f"study-circle-{suffix[:8]}-")
             assert first_data["slug"] != second_data["slug"]
             assert second_data["access_type"] == "invite_only"
             assert "owner_id" not in first_data
+            assert sorted(response.status_code for response in concurrent_joins) == [200, 201], [
+                response.text for response in concurrent_joins
+            ]
+            created_join = next(
+                response for response in concurrent_joins if response.status_code == 201
+            )
+            assert created_join.json()["community_id"] == first_data["id"]
+            assert created_join.json()["role"] == "member"
+            assert "user_id" not in created_join.json()
+            assert private_join.status_code == 404
+            assert private_leave.status_code == 404
+            assert first_leave.status_code == repeated_leave.status_code == 204
+            assert rejoin.status_code == 201
+            assert expired_join.status_code == 404
+            assert owner_leave.status_code == 409
 
             async with session_factory() as session:
                 memberships = await session.scalars(
@@ -86,9 +151,10 @@ def test_creator_is_persisted_as_owner_and_duplicate_names_get_unique_slugs() ->
                     )
                 )
                 rows = list(memberships.all())
-                assert len(rows) == 2
-                assert all(row.user_id == owner_id for row in rows)
-                assert all(row.role == "owner" for row in rows)
+                assert len(rows) == 3
+                assert sum(row.user_id == owner_id for row in rows) == 2
+                assert sum(row.user_id == joiner_id for row in rows) == 1
+                assert sum(row.role == "owner" for row in rows) == 2
 
             with pytest.raises(IntegrityError):
                 async with session_factory() as session:
@@ -102,9 +168,10 @@ def test_creator_is_persisted_as_owner_and_duplicate_names_get_unique_slugs() ->
                     await session.flush()
         finally:
             async with session_factory() as session:
-                if created_ids:
-                    await session.execute(delete(Community).where(Community.id.in_(created_ids)))
-                await session.execute(delete(User).where(User.id == owner_id))
+                await session.execute(
+                    delete(Community).where(Community.id.in_([*created_ids, expired_community_id]))
+                )
+                await session.execute(delete(User).where(User.id.in_([owner_id, joiner_id])))
                 await session.commit()
             await engine.dispose()
 

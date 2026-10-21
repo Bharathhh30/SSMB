@@ -414,13 +414,17 @@ with Mailpit. Durable email retry/outbox and scheduled expired-rate-bucket
 cleanup, profile privacy/block/account controls, and production email
 configuration remain outstanding.
 
-The first Phase 3 backend slice adds Alembic revision
+The Phase 3 backend foundation slice adds Alembic revision
 `0005_community_memberships`, verified-user community creation, normalized
 request fields, optional future expiry, readable unique slugs, and an atomic
-founder/owner membership. On an isolated PostgreSQL 18 test cluster, the full
-suite passed 74/74 with zero skips; Alembic downgrade to `0004`, re-upgrade to
-head, and model-drift checks passed. Creation validation, anonymous rejection,
-duplicate-name slug generation, and owner-membership persistence are covered.
-Phase 3 remains in progress; joins/leaves, owner management, invites, moderator
-controls, and the remaining access/privacy contracts are not yet implemented.
-No mobile files were changed.
+founder/owner membership, including a data backfill for communities that
+predate the membership table. Authenticated users can idempotently join active
+open communities and leave non-owner memberships; row locking and database
+uniqueness protect concurrent membership changes. Invite-only and expired
+communities remain hidden from non-member join/leave attempts, and owners cannot
+leave before ownership transfer exists. Migration SQL was reviewed; upgrade
+from `0004` backfilled a pre-existing founder, downgrade/re-upgrade succeeded,
+and Alembic reported no model drift. The full suite passed 76/76 against an
+isolated PostgreSQL 18 cluster with zero skips. Phase 3 remains in progress;
+owner management, invites, moderator controls, and remaining access/privacy
+contracts are not yet implemented. No mobile files were changed.

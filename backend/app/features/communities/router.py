@@ -1,13 +1,22 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_database_session
 from app.features.auth.dependencies import AuthenticatedDependency
 from app.features.communities import service
-from app.features.communities.schemas import CommunityCreate, CommunityPage, CommunityRead
-from app.features.communities.service import CommunitySlugConflict
+from app.features.communities.schemas import (
+    CommunityCreate,
+    CommunityMembershipRead,
+    CommunityPage,
+    CommunityRead,
+)
+from app.features.communities.service import (
+    CommunityNotJoinable,
+    CommunityOwnerCannotLeave,
+    CommunitySlugConflict,
+)
 
 router = APIRouter(prefix="/communities", tags=["communities"])
 DatabaseSession = Annotated[AsyncSession, Depends(get_database_session)]
@@ -36,6 +45,68 @@ async def create_community(
             detail="A community URL conflict occurred. Please retry.",
         ) from None
     return CommunityRead.model_validate(community)
+
+
+@router.post(
+    "/{slug}/join",
+    response_model=CommunityMembershipRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Join an open community",
+)
+async def join_community(
+    principal: AuthenticatedDependency,
+    session: DatabaseSession,
+    response: Response,
+    slug: Annotated[
+        str,
+        Path(min_length=1, max_length=140, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$"),
+    ],
+) -> CommunityMembershipRead:
+    try:
+        membership, created = await service.join_community(
+            session,
+            slug=slug,
+            user_id=principal.user.id,
+        )
+    except CommunityNotJoinable:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Community not found",
+        ) from None
+    response.status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
+    return CommunityMembershipRead.model_validate(membership)
+
+
+@router.delete(
+    "/{slug}/leave",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Leave a community",
+)
+async def leave_community(
+    principal: AuthenticatedDependency,
+    session: DatabaseSession,
+    slug: Annotated[
+        str,
+        Path(min_length=1, max_length=140, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$"),
+    ],
+) -> Response:
+    try:
+        await service.leave_community(
+            session,
+            slug=slug,
+            user_id=principal.user.id,
+        )
+    except CommunityNotJoinable:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Community not found",
+        ) from None
+    except CommunityOwnerCannotLeave:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Transfer community ownership before leaving",
+        ) from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(

@@ -88,6 +88,8 @@ reason rather than silently omitting it.
 | `GET /api/v1/communities/{slug}` | Public preview only; private, expired, and unknown slugs are indistinguishable 404s | Slug alphabet/length, expiry boundary, private metadata non-disclosure, response field allowlist |
 | `GET /api/v1/topics` | Distinct trimmed topics with active open communities; capped at 50 | Exclude private/expired, trim/dedupe, ordering, cap, DB unavailable |
 | `POST /api/v1/communities` | Verified signed-in user creates an `open` or `invite_only` community; creator receives owner membership; slug is generated from the name | Anonymous/revoked session, invalid/blank/oversized fields, timezone-less/past expiry, extra fields, duplicate names/slugs, transaction atomicity, response allowlist |
+| `POST /api/v1/communities/{slug}/join` | Authenticated user joins an active open community; retries return the existing membership | Anonymous, invalid/unknown/private/expired slug, duplicate/concurrent joins, unique membership constraint, response allowlist |
+| `DELETE /api/v1/communities/{slug}/leave` | Authenticated member leaves; repeated leave from an active open community is idempotent; owner must transfer ownership first | Anonymous, unknown/private non-member, expired community, owner denial, repeated/concurrent leave, transaction consistency |
 | `GET /api/v1/profile/me` | Authenticated caller's display name and private interests only | Missing/expired/revoked auth, no email/hash leakage, empty interests |
 | `PATCH /api/v1/profile/me` | Update caller's display name; add/remove private interests | Blank/null/unknown/oversized/duplicate values, atomic add/remove behavior, clearing interests |
 

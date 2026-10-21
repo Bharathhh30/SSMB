@@ -44,12 +44,24 @@ async def post_json(app: FastAPI, path: str, payload: dict[str, object]) -> Resp
         return await client.post(path, json=payload)
 
 
+async def delete_path(app: FastAPI, path: str) -> Response:
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        return await client.delete(path)
+
+
 def get(app: FastAPI, path: str) -> Response:
     return asyncio.run(request(app, path))
 
 
 def post(app: FastAPI, path: str, payload: dict[str, object]) -> Response:
     return asyncio.run(post_json(app, path, payload))
+
+
+def delete(app: FastAPI, path: str) -> Response:
+    return asyncio.run(delete_path(app, path))
 
 
 def test_discover_communities_returns_a_bounded_page() -> None:
@@ -242,6 +254,24 @@ def test_community_creation_requires_authentication() -> None:
     }
 
     response = post(make_test_app(session), "/api/v1/communities", payload)
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Authentication required"}
+    session.add_all.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("join", "/api/v1/communities/study-circle/join"),
+        ("leave", "/api/v1/communities/study-circle/leave"),
+    ],
+)
+def test_membership_changes_require_authentication(method: str, path: str) -> None:
+    session = AsyncMock(spec=AsyncSession)
+    app = make_test_app(session)
+
+    response = post(app, path, {}) if method == "join" else delete(app, path)
 
     assert response.status_code == 401
     assert response.json() == {"detail": "Authentication required"}

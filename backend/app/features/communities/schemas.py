@@ -29,6 +29,14 @@ class CommunityTopicList(BaseModel):
     items: list[str]
 
 
+class CommunityMembershipRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    community_id: UUID
+    role: Literal["owner", "moderator", "member"]
+    joined_at: datetime
+
+
 class CommunityCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

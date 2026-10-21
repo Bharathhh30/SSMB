@@ -1,17 +1,26 @@
 import re
 import unicodedata
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.communities import repository
-from app.features.communities.models import Community
+from app.features.communities.models import Community, CommunityMembership
 from app.features.communities.schemas import CommunityCreate
 
 
 class CommunitySlugConflict(Exception):
     """The generated public slug collided with another community."""
+
+
+class CommunityNotJoinable(Exception):
+    """The community does not exist or cannot be joined by this caller."""
+
+
+class CommunityOwnerCannotLeave(Exception):
+    """The owner must transfer ownership before leaving their community."""
 
 
 async def get_public_community(session: AsyncSession, *, slug: str) -> Community | None:
@@ -70,6 +79,71 @@ async def create_community(
         if _is_slug_unique_conflict(error):
             raise CommunitySlugConflict from error
         raise
+
+
+async def join_community(
+    session: AsyncSession,
+    *,
+    slug: str,
+    user_id: UUID,
+) -> tuple[CommunityMembership, bool]:
+    now = datetime.now(UTC)
+    community = await repository.get_joinable_community(session, slug=slug, now=now)
+    if community is None:
+        await session.rollback()
+        raise CommunityNotJoinable
+
+    membership = await repository.get_membership(
+        session,
+        community_id=community.id,
+        user_id=user_id,
+    )
+    if membership is not None:
+        await session.commit()
+        return membership, False
+
+    membership = await repository.add_member(
+        session,
+        community_id=community.id,
+        user_id=user_id,
+    )
+    await session.commit()
+    return membership, True
+
+
+async def leave_community(
+    session: AsyncSession,
+    *,
+    slug: str,
+    user_id: UUID,
+) -> None:
+    community = await repository.get_community_by_slug_for_leave(session, slug=slug)
+    if community is None:
+        await session.rollback()
+        raise CommunityNotJoinable
+
+    membership = await repository.get_membership(
+        session,
+        community_id=community.id,
+        user_id=user_id,
+    )
+    now = datetime.now(UTC)
+    if membership is None:
+        is_public_and_active = community.access_type == "open" and (
+            community.expires_at is None or community.expires_at > now
+        )
+        if is_public_and_active:
+            await session.commit()
+            return
+        await session.rollback()
+        raise CommunityNotJoinable
+
+    if membership.role == "owner" or community.owner_id == user_id:
+        await session.rollback()
+        raise CommunityOwnerCannotLeave
+
+    await repository.delete_membership(session, membership)
+    await session.commit()
 
 
 def _slugify(value: str) -> str:

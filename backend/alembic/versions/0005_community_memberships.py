@@ -58,6 +58,13 @@ def upgrade() -> None:
         "community_memberships",
         ["user_id"],
     )
+    op.execute(
+        """
+        INSERT INTO community_memberships (id, community_id, user_id, role)
+        SELECT id, id, owner_id, 'owner'
+        FROM communities
+        """
+    )
 
 
 def downgrade() -> None:
