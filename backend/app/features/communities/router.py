@@ -1,14 +1,41 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_database_session
+from app.features.auth.dependencies import AuthenticatedDependency
 from app.features.communities import service
-from app.features.communities.schemas import CommunityPage, CommunityRead
+from app.features.communities.schemas import CommunityCreate, CommunityPage, CommunityRead
+from app.features.communities.service import CommunitySlugConflict
 
 router = APIRouter(prefix="/communities", tags=["communities"])
 DatabaseSession = Annotated[AsyncSession, Depends(get_database_session)]
+
+
+@router.post(
+    "",
+    response_model=CommunityRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a community",
+)
+async def create_community(
+    data: CommunityCreate,
+    principal: AuthenticatedDependency,
+    session: DatabaseSession,
+) -> CommunityRead:
+    try:
+        community = await service.create_community(
+            session,
+            owner_id=principal.user.id,
+            data=data,
+        )
+    except CommunitySlugConflict:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A community URL conflict occurred. Please retry.",
+        ) from None
+    return CommunityRead.model_validate(community)
 
 
 @router.get(

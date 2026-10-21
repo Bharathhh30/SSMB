@@ -61,3 +61,37 @@ class Community(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+
+class CommunityMembership(Base):
+    __tablename__ = "community_memberships"
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('owner', 'moderator', 'member')",
+            name="ck_community_memberships_role",
+        ),
+        UniqueConstraint(
+            "community_id",
+            "user_id",
+            name="uq_community_memberships_community_user",
+        ),
+        Index("ix_community_memberships_user_id", "user_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    community_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("communities.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    joined_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )

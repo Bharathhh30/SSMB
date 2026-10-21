@@ -1,6 +1,6 @@
 # Phase 3 — Communities, discovery, access, and roles
 
-**Status:** In progress (read-only discovery slices delivered ahead of the phase gate)
+**Status:** In progress — public discovery is implemented; authenticated community creation and founder membership are implemented and PostgreSQL-tested. Join/leave, invites, management, and role actions remain.
 **Goal:** Make the core discover → join → participate journey work with enforceable community access rules.
 
 ## Backend-first sequencing
@@ -38,3 +38,24 @@ frontend implementation before backend completion.
 - A user can create/discover/join/leave a community and invite another authorized user.
 - API tests prove a community member cannot read or mutate another private community's data.
 - Founder and moderator permissions follow the approved matrix and all privileged changes are auditable.
+
+## Backend implementation progress
+
+- [x] Add the community membership table with role and duplicate-membership
+  constraints through Alembic revision `0005_community_memberships`.
+- [x] Implement `POST /api/v1/communities` for verified authenticated users,
+  supporting the agreed `open` and `invite_only` access types.
+- [x] Normalize request text, validate expiry timestamps, generate URL-safe
+  slugs, and avoid collisions for repeated community names.
+- [x] Create the community and its founder/owner membership atomically.
+- [x] Return an allowlisted community response without exposing the owner ID.
+- [x] Test anonymous requests, request validation boundaries, duplicate-name
+  slugs, and persisted founder membership against PostgreSQL.
+- [ ] Implement owner read/update/archive controls and member join/leave APIs.
+- [ ] Implement invite lifecycle, moderator roles, ownership transfer, and
+  private member-roster access rules.
+
+The first creation slice deliberately does not decide invite-link lifetime,
+community deletion/archive semantics, access requests, moderator capabilities,
+or private roster visibility. Those remain explicit policy/contract work for
+their respective endpoint slices.

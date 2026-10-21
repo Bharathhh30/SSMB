@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -10,6 +11,8 @@ from httpx import ASGITransport, AsyncClient, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_database_session
+from app.features.auth.dependencies import require_authenticated_principal
+from app.features.communities import service as community_service
 from app.features.communities.models import Community
 from app.main import create_app
 
@@ -33,8 +36,20 @@ async def request(app: FastAPI, path: str) -> Response:
         return await client.get(path)
 
 
+async def post_json(app: FastAPI, path: str, payload: dict[str, object]) -> Response:
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        return await client.post(path, json=payload)
+
+
 def get(app: FastAPI, path: str) -> Response:
     return asyncio.run(request(app, path))
+
+
+def post(app: FastAPI, path: str, payload: dict[str, object]) -> Response:
+    return asyncio.run(post_json(app, path, payload))
 
 
 def test_discover_communities_returns_a_bounded_page() -> None:
@@ -216,3 +231,166 @@ def test_community_detail_accepts_maximum_length_slug() -> None:
 
     assert response.status_code == 404
     session.scalar.assert_awaited_once()
+
+
+def test_community_creation_requires_authentication() -> None:
+    session = AsyncMock(spec=AsyncSession)
+    payload = {
+        "name": "Study Circle",
+        "topic": "Biology",
+        "access_type": "open",
+    }
+
+    response = post(make_test_app(session), "/api/v1/communities", payload)
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Authentication required"}
+    session.add_all.assert_not_called()
+
+
+def test_community_creation_returns_only_public_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+    owner_id = uuid4()
+    community = Community(
+        id=uuid4(),
+        owner_id=owner_id,
+        name="Study Circle",
+        slug="study-circle",
+        topic="Biology",
+        description="A study group.",
+        access_type="open",
+        expires_at=None,
+        created_at=datetime.now(UTC),
+    )
+    session = AsyncMock(spec=AsyncSession)
+    app = make_test_app(session)
+    principal = SimpleNamespace(user=SimpleNamespace(id=owner_id))
+    app.dependency_overrides[require_authenticated_principal] = lambda: principal
+    create = AsyncMock(return_value=community)
+    monkeypatch.setattr(community_service, "create_community", create)
+
+    response = post(
+        app,
+        "/api/v1/communities",
+        {
+            "name": "  Study Circle  ",
+            "topic": " Biology ",
+            "description": " A study group. ",
+            "access_type": "open",
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json() == {
+        "id": str(community.id),
+        "slug": "study-circle",
+        "name": "Study Circle",
+        "topic": "Biology",
+        "description": "A study group.",
+        "access_type": "open",
+        "expires_at": None,
+        "created_at": community.created_at.isoformat().replace("+00:00", "Z"),
+    }
+    assert "owner_id" not in response.json()
+    create.assert_awaited_once()
+    assert create.await_args.kwargs["owner_id"] == owner_id
+    assert create.await_args.kwargs["data"].name == "Study Circle"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"topic": "Biology", "access_type": "open"},
+        {"name": " ", "topic": "Biology", "access_type": "open"},
+        {"name": "Study", "topic": "\t", "access_type": "open"},
+        {"name": "Study", "topic": "Biology", "access_type": "public"},
+        {"name": "s" * 121, "topic": "Biology", "access_type": "open"},
+        {"name": "Study", "topic": "t" * 81, "access_type": "open"},
+        {
+            "name": "Study",
+            "topic": "Biology",
+            "description": "d" * 5001,
+            "access_type": "open",
+        },
+        {
+            "name": "Study",
+            "topic": "Biology",
+            "description": None,
+            "access_type": "open",
+        },
+        {"name": "Study", "topic": "Biology", "access_type": None},
+        {
+            "name": "Study",
+            "topic": "Biology",
+            "access_type": "open",
+            "unexpected": "value",
+        },
+        {
+            "name": "Study",
+            "topic": "Biology",
+            "access_type": "open",
+            "expires_at": "2030-01-01T00:00:00",
+        },
+    ],
+)
+def test_community_creation_rejects_invalid_payloads(
+    payload: dict[str, object],
+) -> None:
+    session = AsyncMock(spec=AsyncSession)
+    app = make_test_app(session)
+    app.dependency_overrides[require_authenticated_principal] = lambda: SimpleNamespace(
+        user=SimpleNamespace(id=uuid4())
+    )
+
+    response = post(app, "/api/v1/communities", payload)
+
+    assert response.status_code == 422
+    session.add_all.assert_not_called()
+
+
+def test_community_creation_hides_slug_conflict_details(monkeypatch: pytest.MonkeyPatch) -> None:
+    owner_id = uuid4()
+    session = AsyncMock(spec=AsyncSession)
+    app = make_test_app(session)
+    app.dependency_overrides[require_authenticated_principal] = lambda: SimpleNamespace(
+        user=SimpleNamespace(id=owner_id)
+    )
+
+    async def fail_with_slug_conflict(*_args: object, **_kwargs: object) -> Community:
+        raise community_service.CommunitySlugConflict
+
+    monkeypatch.setattr(community_service, "create_community", fail_with_slug_conflict)
+    response = post(
+        app,
+        "/api/v1/communities",
+        {
+            "name": "Study Circle",
+            "topic": "Biology",
+            "access_type": "open",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "A community URL conflict occurred. Please retry."}
+
+
+def test_community_creation_rejects_expired_timestamp() -> None:
+    session = AsyncMock(spec=AsyncSession)
+    app = make_test_app(session)
+    app.dependency_overrides[require_authenticated_principal] = lambda: SimpleNamespace(
+        user=SimpleNamespace(id=uuid4())
+    )
+    expired_at = (datetime.now(UTC) - timedelta(minutes=1)).isoformat()
+
+    response = post(
+        app,
+        "/api/v1/communities",
+        {
+            "name": "Study",
+            "topic": "Biology",
+            "access_type": "open",
+            "expires_at": expired_at,
+        },
+    )
+
+    assert response.status_code == 422
+    session.add_all.assert_not_called()

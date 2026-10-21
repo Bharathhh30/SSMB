@@ -1,9 +1,10 @@
 from datetime import UTC, datetime
+from uuid import UUID, uuid4
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.features.communities.models import Community
+from app.features.communities.models import Community, CommunityMembership
 
 PUBLIC_TOPIC_LIMIT = 50
 
@@ -72,3 +73,39 @@ async def get_public_community(session: AsyncSession, *, slug: str) -> Community
         or_(Community.expires_at.is_(None), Community.expires_at > now),
     )
     return await session.scalar(statement)
+
+
+async def community_slug_exists(session: AsyncSession, *, slug: str) -> bool:
+    return bool(await session.scalar(select(Community.id).where(Community.slug == slug)))
+
+
+async def create_community(
+    session: AsyncSession,
+    *,
+    owner_id: UUID,
+    name: str,
+    slug: str,
+    topic: str,
+    description: str,
+    access_type: str,
+    expires_at: datetime | None,
+) -> Community:
+    community = Community(
+        id=uuid4(),
+        owner_id=owner_id,
+        name=name,
+        slug=slug,
+        topic=topic,
+        description=description,
+        access_type=access_type,
+        expires_at=expires_at,
+    )
+    founder_membership = CommunityMembership(
+        id=uuid4(),
+        community_id=community.id,
+        user_id=owner_id,
+        role="owner",
+    )
+    session.add_all([community, founder_membership])
+    await session.flush()
+    return community

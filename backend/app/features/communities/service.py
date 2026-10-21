@@ -1,7 +1,17 @@
+import re
+import unicodedata
+from uuid import UUID, uuid4
+
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.communities import repository
 from app.features.communities.models import Community
+from app.features.communities.schemas import CommunityCreate
+
+
+class CommunitySlugConflict(Exception):
+    """The generated public slug collided with another community."""
 
 
 async def get_public_community(session: AsyncSession, *, slug: str) -> Community | None:
@@ -29,3 +39,57 @@ async def discover_communities(
 
 async def discoverable_topics(session: AsyncSession) -> list[str]:
     return await repository.list_public_topics(session)
+
+
+async def create_community(
+    session: AsyncSession,
+    *,
+    owner_id: UUID,
+    data: CommunityCreate,
+) -> Community:
+    base_slug = _slugify(data.name)
+    slug = base_slug
+    if await repository.community_slug_exists(session, slug=slug):
+        slug = _with_unique_suffix(base_slug)
+
+    try:
+        community = await repository.create_community(
+            session,
+            owner_id=owner_id,
+            name=data.name,
+            slug=slug,
+            topic=data.topic,
+            description=data.description,
+            access_type=data.access_type,
+            expires_at=data.expires_at,
+        )
+        await session.commit()
+        return community
+    except IntegrityError as error:
+        await session.rollback()
+        if _is_slug_unique_conflict(error):
+            raise CommunitySlugConflict from error
+        raise
+
+
+def _slugify(value: str) -> str:
+    ascii_value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode()
+    slug = re.sub(r"[^a-z0-9]+", "-", ascii_value.lower()).strip("-")
+    return slug[:140].rstrip("-") or "community"
+
+
+def _with_unique_suffix(base_slug: str) -> str:
+    suffix = uuid4().hex[:8]
+    return f"{base_slug[: 140 - len(suffix) - 1].rstrip('-')}-{suffix}"
+
+
+def _is_slug_unique_conflict(error: Exception) -> bool:
+    current: object | None = error
+    while current is not None:
+        if (
+            getattr(current, "sqlstate", None) == "23505"
+            and getattr(current, "constraint_name", None) == "uq_communities_slug"
+        ):
+            return True
+        current = getattr(current, "orig", None) or getattr(current, "__cause__", None)
+    return False
