@@ -1,7 +1,7 @@
 # Backend-first execution and API verification plan
 
 **Status:** Active
-**Last updated:** 2026-10-19
+**Last updated:** 2026-10-21
 **Authority:** This document operationalizes the cumulative scope in `ROADMAP.md`.
 
 ## 1. Sequencing decision
@@ -88,7 +88,7 @@ reason rather than silently omitting it.
 | `GET /api/v1/communities/{slug}` | Public preview only; private, expired, and unknown slugs are indistinguishable 404s | Slug alphabet/length, expiry boundary, private metadata non-disclosure, response field allowlist |
 | `GET /api/v1/topics` | Distinct trimmed topics with active open communities; capped at 50 | Exclude private/expired, trim/dedupe, ordering, cap, DB unavailable |
 | `GET /api/v1/profile/me` | Authenticated caller's display name and private interests only | Missing/expired/revoked auth, no email/hash leakage, empty interests |
-| `PATCH /api/v1/profile/me` | Update caller's display name and private free-form interests | Blank/null/unknown/oversized/duplicate values, atomic replacement, clear list |
+| `PATCH /api/v1/profile/me` | Update caller's display name; add/remove private interests | Blank/null/unknown/oversized/duplicate values, atomic add/remove behavior, clearing interests |
 
 This is only the currently implemented public surface. Each new feature phase
 must add its endpoint inventory and test matrix before its API is considered
@@ -191,7 +191,7 @@ Immediate execution:
   | `POST /api/v1/auth/password/forgot` | Request recovery instructions | `202` generic response for known/unknown; throttled `429` |
   | `POST /api/v1/auth/password/reset` | Consume recovery token and revoke sessions | `200`; invalid/expired/replayed token `400`; invalid password `422` |
   | `GET /api/v1/profile/me` | Read caller's private profile | `200`; unauthenticated/expired/revoked session `401` |
-  | `PATCH /api/v1/profile/me` | Update caller's display name/private interests | `200`; invalid/duplicate/oversized/unknown fields `422`; unauthenticated `401` |
+| `PATCH /api/v1/profile/me` | Update caller's display name and add/remove private interests | `200`; invalid/duplicate/oversized/unknown fields `422`; unauthenticated `401` |
 - Identity migrations add nullable-compatible user email/password hash/
   verification fields, session/refresh/action-token records, and rate-limit
   buckets.

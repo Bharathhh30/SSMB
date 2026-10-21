@@ -74,7 +74,8 @@ frontend work.
 - [x] Verify Alembic drift and run the complete database-backed suite with zero
   skipped tests.
 - [x] Add self-only profile read/update endpoints for display name and private
-  free-form interests, with transactional persistence and input limits.
+  free-form interests; `interests` adds idempotently and `remove_interests`
+  removes explicitly.
 - [x] Test unauthenticated access, allowed updates, blank/duplicate/oversized
   values, unknown fields, and interest clearing.
 - [x] Document copy/paste payloads and provide a PowerShell smoke script that

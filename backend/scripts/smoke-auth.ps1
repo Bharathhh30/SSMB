@@ -108,13 +108,20 @@ $profileDraft = Invoke-RestMethod `
   -Headers $authHeaders `
   -Body (ConvertTo-Json -InputObject @{
     display_name = "Backend smoke profile"
-    interests = @("Exam prep", "Technology")
+    interests = @("backend")
   } -Depth 5)
-if (
-  $profileDraft.display_name -ne "Backend smoke profile" -or
-  $profileDraft.interests.Count -ne 2
-) {
+if ($profileDraft.display_name -ne "Backend smoke profile" -or $profileDraft.interests.Count -ne 1) {
   throw "Private profile update did not persist."
+}
+
+$profileDraft = Invoke-RestMethod `
+  -Method Patch `
+  -Uri "$ApiBaseUrl/profile/me" `
+  -ContentType "application/json" `
+  -Headers $authHeaders `
+  -Body (ConvertTo-Json -InputObject @{ interests = @("native") } -Depth 5)
+if ($profileDraft.interests.Count -ne 2 -or $profileDraft.interests[1] -ne "native") {
+  throw "Profile PATCH replaced existing interests instead of adding the new interest."
 }
 
 $refreshed = Invoke-JsonPost -Path "/auth/refresh" -Body @{

@@ -15,8 +15,21 @@ class ProfileRead(BaseModel):
 class ProfileUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    display_name: str | None = Field(default=None, max_length=80)
-    interests: list[str] | None = Field(default=None, max_length=MAX_PROFILE_INTERESTS)
+    display_name: str | None = Field(
+        default=None,
+        max_length=80,
+        description="Replace the current display name.",
+    )
+    interests: list[str] | None = Field(
+        default=None,
+        max_length=MAX_PROFILE_INTERESTS,
+        description="Interests to add. Existing interests are preserved.",
+    )
+    remove_interests: list[str] | None = Field(
+        default=None,
+        max_length=MAX_PROFILE_INTERESTS,
+        description="Interests to remove. Missing interests are ignored.",
+    )
 
     @field_validator("display_name")
     @classmethod
@@ -28,7 +41,7 @@ class ProfileUpdate(BaseModel):
             raise ValueError("Display name cannot be blank")
         return normalized
 
-    @field_validator("interests")
+    @field_validator("interests", "remove_interests")
     @classmethod
     def validate_interests(cls, values: list[str] | None) -> list[str] | None:
         if values is None:
@@ -50,5 +63,12 @@ class ProfileUpdate(BaseModel):
         if "display_name" in self.model_fields_set and self.display_name is None:
             raise ValueError("Display name cannot be null")
         if "interests" in self.model_fields_set and self.interests is None:
-            raise ValueError("Interests cannot be null; use an empty list to clear them")
+            raise ValueError("Interests cannot be null; use an empty list for no additions")
+        if "remove_interests" in self.model_fields_set and self.remove_interests is None:
+            raise ValueError("remove_interests cannot be null; use an empty list for no removals")
+
+        additions = {value.casefold() for value in self.interests or []}
+        removals = {value.casefold() for value in self.remove_interests or []}
+        if additions.intersection(removals):
+            raise ValueError("An interest cannot be added and removed in the same request")
         return self

@@ -79,13 +79,18 @@ Authorization: Bearer <access_token>
 ```json
 {
   "display_name": "Backend Test",
-  "interests": ["Exam prep", "Technology"]
+  "interests": ["backend"]
 }
 ```
 
 Send that body to `PATCH /api/v1/profile/me` with the same bearer token.
-Interests are free-form, private to the account, and case-insensitive duplicate
-values are rejected; no public profile-visibility policy is implied.
+The `interests` field **adds** tags to the existing list; it does not replace
+them. To remove tags, send `{"remove_interests":["Exam prep"]}`. An empty
+`interests` list is a no-op. Interests are private to the account; public
+profile visibility is not implied.
+
+For example, PATCH `{"interests":["native"]}` after the request above should
+return both `"backend"` and `"native"` in the profile response.
 
 **Refresh**
 

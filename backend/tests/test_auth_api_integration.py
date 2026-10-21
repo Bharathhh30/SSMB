@@ -498,13 +498,39 @@ def test_private_profile_update_validates_and_persists_display_name_and_interest
             assert updated.json()["display_name"] == "Updated Profile"
             assert updated.json()["interests"] == ["Exam prep", "Technology"]
 
+            added = await client.patch(
+                "/api/v1/profile/me",
+                headers=auth_headers,
+                json={"interests": ["Native"]},
+            )
+            assert added.status_code == 200
+            assert added.json()["interests"] == ["Exam prep", "Technology", "Native"]
+
+            duplicate_add = await client.patch(
+                "/api/v1/profile/me",
+                headers=auth_headers,
+                json={"interests": ["native"]},
+            )
+            assert duplicate_add.status_code == 200
+            assert duplicate_add.json()["interests"] == ["Exam prep", "Technology", "Native"]
+
+            removed = await client.patch(
+                "/api/v1/profile/me",
+                headers=auth_headers,
+                json={"remove_interests": ["exam prep"]},
+            )
+            assert removed.status_code == 200
+            assert removed.json()["interests"] == ["Technology", "Native"]
+
             invalid_patches = [
                 {},
                 {"display_name": None},
                 {"interests": None},
+                {"remove_interests": None},
                 {"display_name": "   "},
                 {"interests": ["Technology", " technology "]},
                 {"interests": [" "]},
+                {"interests": ["Native"], "remove_interests": ["native"]},
                 {"interests": ["x" * 81]},
                 {"interests": [f"Topic {index}" for index in range(21)]},
                 {"unexpected_field": "must be rejected"},
@@ -519,12 +545,29 @@ def test_private_profile_update_validates_and_persists_display_name_and_interest
 
             unchanged = await client.get("/api/v1/profile/me", headers=auth_headers)
             assert unchanged.json()["display_name"] == "Updated Profile"
-            assert unchanged.json()["interests"] == ["Exam prep", "Technology"]
+            assert unchanged.json()["interests"] == ["Technology", "Native"]
+
+            over_limit = await client.patch(
+                "/api/v1/profile/me",
+                headers=auth_headers,
+                json={"interests": [f"Additional {index}" for index in range(19)]},
+            )
+            assert over_limit.status_code == 422
+            after_over_limit = await client.get("/api/v1/profile/me", headers=auth_headers)
+            assert after_over_limit.json()["interests"] == ["Technology", "Native"]
+
+            empty_addition = await client.patch(
+                "/api/v1/profile/me",
+                headers=auth_headers,
+                json={"interests": []},
+            )
+            assert empty_addition.status_code == 200
+            assert empty_addition.json()["interests"] == ["Technology", "Native"]
 
             cleared = await client.patch(
                 "/api/v1/profile/me",
                 headers=auth_headers,
-                json={"interests": []},
+                json={"remove_interests": ["Technology", "Native"]},
             )
             assert cleared.status_code == 200
             assert cleared.json()["interests"] == []
