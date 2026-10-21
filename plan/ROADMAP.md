@@ -316,6 +316,7 @@ Must be resolved in the indicated phase; absence of a choice must not block plan
 | Audience, age floor, initial locale | Validate launch audience and legal/privacy requirements before identity and public launch | 0/2 |
 | Expo Router and state/data libraries | Prefer Expo Router; choose state, query/cache, and forms libraries based on supported versions and team comfort | 0 |
 | Auth method | **Approved:** email/password with verified email and account recovery; no social sign-in initially. Email delivery remains behind a replaceable adapter. | 2 |
+| Community invites | **Approved:** owner-created, single-use, revocable token; maximum 7-day lifetime; verified signed-in acceptance; raw token shown once and hash-only persistence. | 3 |
 | Cloud provider, region, deployment target, budget | Compare managed container hosting, managed PostgreSQL, storage, backups, data residency, and egress cost after prototype signoff | 10 |
 | ORM and DB access | Validate SQLAlchemy async/sync approach, pooling, transaction boundaries, and migration tooling | 0 |
 | Email, push, object storage | Pick providers and define adapters, deliverability, costs, residency, and failure policy | 0/4/5 |
@@ -424,12 +425,21 @@ uniqueness protect concurrent membership changes. Invite-only and expired
 communities remain hidden from non-member join/leave attempts, and owners cannot
 leave before ownership transfer exists. Migration SQL was reviewed; upgrade
 from `0004` backfilled a pre-existing founder, downgrade/re-upgrade succeeded,
-and Alembic reported no model drift. The community creation/join/leave/owner
 and Alembic reported no model drift. Public community detail includes member
 count without exposing identities. Management routes distinguish authenticated
 non-owner `403` responses from unknown-community `404` responses and document
 those outcomes. The expanded suite passed 91/91 tests against an isolated
 PostgreSQL 18 cluster with zero skips, including exact count and
-owner/non-owner/unknown status cases. Phase 3 remains in progress; archive
-behavior, invites, moderator controls, ownership transfer, and remaining
-access/privacy contracts are not yet implemented. No mobile files were changed.
+owner/non-owner/unknown status cases.
+
+Invite policy is approved: owner-created, single-use, revocable links expire
+within seven days and require verified signed-in acceptance. Alembic revision
+`0006_community_invites` stores only token hashes. Owners can create, list, and
+revoke invite metadata; acceptance is replay-safe for the same account,
+rejects other-account reuse, respects community expiry, and is rate-limited.
+The shareable app URL will be constructed by the client, not tied to a backend
+domain. The full suite passed 101/101 tests with zero skips against isolated
+PostgreSQL 18; the new migration was reviewed, downgraded/re-upgraded, and
+Alembic reported no drift. Archive behavior, moderator controls, ownership
+transfer, and remaining access/privacy contracts remain. No mobile files were
+changed.

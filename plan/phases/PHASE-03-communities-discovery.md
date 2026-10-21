@@ -1,6 +1,6 @@
 # Phase 3 — Communities, discovery, access, and roles
 
-**Status:** In progress — public discovery, authenticated community creation, open-community join/leave, and owner read/update are implemented and PostgreSQL-tested. Archiving, invites, and role actions remain.
+**Status:** In progress — public discovery, authenticated community creation, open-community join/leave, owner read/update, and invite lifecycle are implemented and PostgreSQL-tested. Archiving and role actions remain.
 **Goal:** Make the core discover → join → participate journey work with enforceable community access rules.
 
 ## Backend-first sequencing
@@ -62,15 +62,22 @@ frontend implementation before backend completion.
   detail response without exposing member identities.
 - [x] Distinguish authenticated management denial (`403`) from a missing
   community (`404`) and document response meanings in OpenAPI.
+- [x] Add owner-created, single-use, revocable invite tokens with a seven-day
+  maximum lifetime and verified-account acceptance.
+- [x] Persist only invite-token hashes; expose invite metadata without secrets,
+  support idempotent same-user acceptance, and prevent cross-user replay.
+- [x] Rate-limit invite creation and acceptance using the shared HMAC-backed
+  PostgreSQL rate-limit store.
 - [ ] Define archive/deletion semantics before implementing lifecycle actions.
-- [ ] Implement invite lifecycle, moderator roles, ownership transfer, and
-  private member-roster access rules.
+- [ ] Implement moderator roles, ownership transfer, and private member-roster
+  access rules.
 
-The first creation slice deliberately does not decide invite-link lifetime,
-community deletion/archive semantics, access requests, moderator capabilities,
-or private roster visibility. Those remain explicit policy/contract work for
-their respective endpoint slices.
+Community deletion/archive semantics, access requests, moderator capabilities,
+and private roster visibility remain explicit policy/contract work for their
+respective endpoint slices. Invite policy is approved: owner-created,
+single-use, revocable tokens, expiring within seven days, accepted only by
+verified signed-in accounts.
 
-Open membership is available immediately. Invite-only communities may be
-created, but additional members cannot join until invite creation, revocation,
-and acceptance endpoints are implemented.
+Open membership is available immediately. Invite-only communities can now
+receive owner-managed invitations; the Expo share-link UI remains deferred
+until backend phase integration.

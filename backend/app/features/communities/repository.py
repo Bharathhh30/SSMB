@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.features.communities.models import Community, CommunityMembership
+from app.features.communities.models import Community, CommunityInvite, CommunityMembership
 
 PUBLIC_TOPIC_LIMIT = 50
 
@@ -206,3 +206,96 @@ async def add_member(
 async def delete_membership(session: AsyncSession, membership: CommunityMembership) -> None:
     await session.delete(membership)
     await session.flush()
+
+
+async def create_invite(
+    session: AsyncSession,
+    *,
+    community_id: UUID,
+    created_by_user_id: UUID,
+    token_hash: str,
+    created_at: datetime,
+    expires_at: datetime,
+) -> CommunityInvite:
+    invite = CommunityInvite(
+        id=uuid4(),
+        community_id=community_id,
+        created_by_user_id=created_by_user_id,
+        token_hash=token_hash,
+        created_at=created_at,
+        expires_at=expires_at,
+    )
+    session.add(invite)
+    await session.flush()
+    return invite
+
+
+async def list_community_invites(
+    session: AsyncSession,
+    *,
+    community_id: UUID,
+    limit: int,
+    offset: int,
+) -> tuple[list[CommunityInvite], int]:
+    total = await session.scalar(
+        select(func.count())
+        .select_from(CommunityInvite)
+        .where(CommunityInvite.community_id == community_id)
+    )
+    statement = (
+        select(CommunityInvite)
+        .where(CommunityInvite.community_id == community_id)
+        .order_by(CommunityInvite.created_at.desc(), CommunityInvite.id.asc())
+        .limit(limit)
+        .offset(offset)
+    )
+    invites = await session.scalars(statement)
+    return list(invites.all()), total or 0
+
+
+async def get_invite_community_id_by_token_hash(
+    session: AsyncSession,
+    *,
+    token_hash: str,
+) -> UUID | None:
+    return await session.scalar(
+        select(CommunityInvite.community_id).where(CommunityInvite.token_hash == token_hash)
+    )
+
+
+async def get_community_by_id_for_update(
+    session: AsyncSession,
+    *,
+    community_id: UUID,
+) -> Community | None:
+    return await session.scalar(
+        select(Community).where(Community.id == community_id).with_for_update()
+    )
+
+
+async def get_invite_by_token_hash(
+    session: AsyncSession,
+    *,
+    token_hash: str,
+    for_update: bool = False,
+) -> CommunityInvite | None:
+    statement = select(CommunityInvite).where(CommunityInvite.token_hash == token_hash)
+    if for_update:
+        statement = statement.with_for_update()
+    return await session.scalar(statement)
+
+
+async def get_community_invite(
+    session: AsyncSession,
+    *,
+    community_id: UUID,
+    invite_id: UUID,
+    for_update: bool = False,
+) -> CommunityInvite | None:
+    statement = select(CommunityInvite).where(
+        CommunityInvite.id == invite_id,
+        CommunityInvite.community_id == community_id,
+    )
+    if for_update:
+        statement = statement.with_for_update()
+    return await session.scalar(statement)

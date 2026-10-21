@@ -35,8 +35,8 @@ Use the same request body with:
 }
 ```
 
-Invite-only communities can be created now, but invite creation and acceptance
-are not implemented yet. Other users therefore cannot join one in this slice.
+Invite-only communities can receive owner-managed invitations as described
+below.
 
 ## Join and leave an open community
 
@@ -76,3 +76,43 @@ and be in the future. Empty patches and explicit nulls for name/topic/
 description/access type return `422`. Authenticated non-owners receive
 `403 Forbidden` with a clear authorization message; unknown slugs return
 `404 Not Found`. A `403` response never includes private community data.
+
+## Create, accept, and revoke an invite
+
+As the community owner, create an invite-only community, then call:
+
+`POST /api/v1/communities/{slug}/invites`
+
+No request body is required. The response contains `invite_id`,
+`invite_token`, and `expires_at`. The token is returned only once and is stored
+as a hash in PostgreSQL. It expires after 7 days at most, or sooner if the
+community expires first.
+
+As another verified, signed-in account, accept it with:
+
+`POST /api/v1/communities/invites/accept`
+
+```json
+{
+  "invite_token": "paste-the-invite_token-returned-at-creation"
+}
+```
+
+The first acceptance returns `201`; retrying as the same account returns
+`200` with its existing membership. A different account trying to reuse the
+token receives `409`. Invalid, expired, or revoked invites receive `404`.
+
+Owners can inspect invite metadata without exposing tokens:
+
+- `GET /api/v1/communities/{slug}/invites`
+- `DELETE /api/v1/communities/{slug}/invites/{invite_id}`
+
+Revocation returns `204` and is safe to repeat. An already accepted invite
+cannot be revoked (`409`). Invite creation is limited to 10 attempts per owner
+and acceptance to 20 attempts per account in the configured rate-limit window
+(15 minutes by default); throttled responses include `Retry-After`.
+
+The backend returns the secret token, not a hardcoded host or app URL. The
+mobile client will wrap it in the shareable deep link when invite-link UI is
+integrated. For this backend smoke test, paste the token into the acceptance
+request above.

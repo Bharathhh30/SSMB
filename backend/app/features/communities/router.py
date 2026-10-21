@@ -1,14 +1,20 @@
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import Settings
 from app.db.session import get_database_session
-from app.features.auth.dependencies import AuthenticatedDependency
+from app.features.auth import service as auth_service
+from app.features.auth.dependencies import AuthenticatedDependency, SettingsDependency
 from app.features.communities import service
 from app.features.communities.schemas import (
     CommunityCreate,
     CommunityDetailRead,
+    CommunityInviteAccept,
+    CommunityInviteCreated,
+    CommunityInvitePage,
     CommunityMembershipRead,
     CommunityPage,
     CommunityRead,
@@ -16,6 +22,9 @@ from app.features.communities.schemas import (
 )
 from app.features.communities.service import (
     CommunityForbidden,
+    CommunityInviteAlreadyUsed,
+    CommunityInviteConflict,
+    CommunityInviteUnavailable,
     CommunityNotFound,
     CommunityNotJoinable,
     CommunityOwnerCannotLeave,
@@ -111,6 +120,181 @@ async def leave_community(
             detail="Transfer community ownership before leaving",
         ) from None
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/{slug}/invites",
+    response_model=CommunityInviteCreated,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a single-use invite for an invite-only community",
+    responses={
+        403: {"description": "The authenticated user is not the community owner."},
+        404: {"description": "No community exists with this slug."},
+        409: {"description": "Invites are unavailable for this community state."},
+        429: {"description": "The invite creation rate limit was exceeded."},
+    },
+)
+async def create_community_invite(
+    principal: AuthenticatedDependency,
+    session: DatabaseSession,
+    settings: SettingsDependency,
+    slug: Annotated[
+        str,
+        Path(min_length=1, max_length=140, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$"),
+    ],
+) -> CommunityInviteCreated:
+    await _enforce_community_invite_rate_limit(
+        session,
+        settings,
+        purpose="community_invite_create",
+        identity=str(principal.user.id),
+        maximum_attempts=service.COMMUNITY_INVITE_CREATE_LIMIT,
+    )
+    try:
+        invite, raw_token = await service.create_community_invite(
+            session,
+            slug=slug,
+            owner_id=principal.user.id,
+        )
+    except CommunityNotFound:
+        raise HTTPException(status_code=404, detail="Community not found") from None
+    except CommunityForbidden:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not authorized to manage this community.",
+        ) from None
+    except CommunityInviteConflict as error:
+        raise HTTPException(status_code=409, detail=str(error)) from None
+    return CommunityInviteCreated(
+        invite_id=invite.id,
+        invite_token=raw_token,
+        expires_at=invite.expires_at,
+    )
+
+
+@router.get(
+    "/{slug}/invites",
+    response_model=CommunityInvitePage,
+    summary="List invite metadata for an owned community",
+    responses={
+        403: {"description": "The authenticated user is not the community owner."},
+        404: {"description": "No community exists with this slug."},
+    },
+)
+async def get_community_invites(
+    principal: AuthenticatedDependency,
+    session: DatabaseSession,
+    slug: Annotated[
+        str,
+        Path(min_length=1, max_length=140, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$"),
+    ],
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> CommunityInvitePage:
+    try:
+        invites, total = await service.list_community_invites(
+            session,
+            slug=slug,
+            owner_id=principal.user.id,
+            limit=limit,
+            offset=offset,
+        )
+    except CommunityNotFound:
+        raise HTTPException(status_code=404, detail="Community not found") from None
+    except CommunityForbidden:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not authorized to manage this community.",
+        ) from None
+    return CommunityInvitePage(items=invites, total=total, limit=limit, offset=offset)
+
+
+@router.delete(
+    "/{slug}/invites/{invite_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Revoke an unused community invite",
+    responses={
+        403: {"description": "The authenticated user is not the community owner."},
+        404: {"description": "The community or invite does not exist."},
+        409: {"description": "The invite has already been accepted."},
+    },
+)
+async def revoke_community_invite(
+    principal: AuthenticatedDependency,
+    session: DatabaseSession,
+    slug: Annotated[
+        str,
+        Path(min_length=1, max_length=140, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$"),
+    ],
+    invite_id: UUID,
+) -> Response:
+    try:
+        await service.revoke_community_invite(
+            session,
+            slug=slug,
+            invite_id=invite_id,
+            owner_id=principal.user.id,
+        )
+    except CommunityNotFound:
+        raise HTTPException(status_code=404, detail="Community not found") from None
+    except CommunityForbidden:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not authorized to manage this community.",
+        ) from None
+    except CommunityInviteUnavailable:
+        raise HTTPException(status_code=404, detail="Invite not found") from None
+    except CommunityInviteAlreadyUsed:
+        raise HTTPException(
+            status_code=409,
+            detail="This invite has already been accepted and cannot be revoked.",
+        ) from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/invites/accept",
+    response_model=CommunityMembershipRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Accept a community invite",
+    responses={
+        404: {"description": "The invite is invalid, expired, revoked, or unavailable."},
+        409: {"description": "The invite has already been accepted by another account."},
+        429: {"description": "The invite acceptance rate limit was exceeded."},
+    },
+)
+async def accept_community_invite(
+    data: CommunityInviteAccept,
+    principal: AuthenticatedDependency,
+    session: DatabaseSession,
+    settings: SettingsDependency,
+    response: Response,
+) -> CommunityMembershipRead:
+    await _enforce_community_invite_rate_limit(
+        session,
+        settings,
+        purpose="community_invite_accept",
+        identity=str(principal.user.id),
+        maximum_attempts=service.COMMUNITY_INVITE_ACCEPT_LIMIT,
+    )
+    try:
+        membership, created = await service.accept_community_invite(
+            session,
+            invite_token=data.invite_token,
+            user_id=principal.user.id,
+        )
+    except CommunityInviteUnavailable:
+        raise HTTPException(
+            status_code=404,
+            detail="Invite is invalid or no longer available.",
+        ) from None
+    except CommunityInviteAlreadyUsed:
+        raise HTTPException(
+            status_code=409,
+            detail="This invite has already been used by another account.",
+        ) from None
+    response.status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
+    return CommunityMembershipRead.model_validate(membership)
 
 
 @router.get(
@@ -238,3 +422,32 @@ async def get_community(
     community, member_count = community_details
     public_fields = CommunityRead.model_validate(community).model_dump()
     return CommunityDetailRead(**public_fields, member_count=member_count)
+
+
+async def _enforce_community_invite_rate_limit(
+    session: AsyncSession,
+    settings: Settings,
+    *,
+    purpose: str,
+    identity: str,
+    maximum_attempts: int,
+) -> None:
+    try:
+        retry_after = await auth_service.consume_rate_limit(
+            session,
+            settings,
+            purpose=purpose,
+            identity=identity,
+            maximum_attempts=maximum_attempts,
+        )
+    except auth_service.RateLimitSecretNotConfigured:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Invite rate limiting is not configured",
+        ) from None
+    if retry_after > 0:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many invite actions. Try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )

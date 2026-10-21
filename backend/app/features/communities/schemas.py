@@ -44,6 +44,40 @@ class CommunityDetailRead(CommunityRead):
     )
 
 
+class CommunityInviteCreated(BaseModel):
+    invite_id: UUID
+    invite_token: str = Field(
+        min_length=40,
+        max_length=128,
+        description="Secret returned only at creation; the database stores only its hash.",
+    )
+    expires_at: datetime
+
+
+class CommunityInviteAccept(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    invite_token: str = Field(
+        min_length=40,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    )
+
+
+class CommunityInviteRead(BaseModel):
+    invite_id: UUID
+    created_at: datetime
+    expires_at: datetime
+    status: Literal["active", "accepted", "revoked", "expired"]
+
+
+class CommunityInvitePage(BaseModel):
+    items: list[CommunityInviteRead]
+    total: int
+    limit: int
+    offset: int
+
+
 class CommunityCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

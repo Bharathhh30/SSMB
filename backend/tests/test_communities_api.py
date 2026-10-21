@@ -44,6 +44,14 @@ async def post_json(app: FastAPI, path: str, payload: dict[str, object]) -> Resp
         return await client.post(path, json=payload)
 
 
+async def post_without_body(app: FastAPI, path: str) -> Response:
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        return await client.post(path)
+
+
 async def delete_path(app: FastAPI, path: str) -> Response:
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -66,6 +74,10 @@ def get(app: FastAPI, path: str) -> Response:
 
 def post(app: FastAPI, path: str, payload: dict[str, object]) -> Response:
     return asyncio.run(post_json(app, path, payload))
+
+
+def post_empty(app: FastAPI, path: str) -> Response:
+    return asyncio.run(post_without_body(app, path))
 
 
 def delete(app: FastAPI, path: str) -> Response:
@@ -312,6 +324,67 @@ def test_owner_management_requires_authentication() -> None:
     assert read.status_code == update.status_code == 401
     assert read.json() == update.json() == {"detail": "Authentication required"}
     session.scalar.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "payload"),
+    [
+        ("post", "/api/v1/communities/study-circle/invites", None),
+        ("get", "/api/v1/communities/study-circle/invites", None),
+        (
+            "delete",
+            f"/api/v1/communities/study-circle/invites/{uuid4()}",
+            None,
+        ),
+        (
+            "accept",
+            "/api/v1/communities/invites/accept",
+            {"invite_token": "A" * 43},
+        ),
+    ],
+)
+def test_invite_routes_require_authentication(
+    method: str,
+    path: str,
+    payload: dict[str, object] | None,
+) -> None:
+    session = AsyncMock(spec=AsyncSession)
+    app = make_test_app(session)
+    if method == "post":
+        response = post_empty(app, path)
+    elif method == "get":
+        response = get(app, path)
+    elif method == "delete":
+        response = delete(app, path)
+    else:
+        assert payload is not None
+        response = post(app, path, payload)
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Authentication required"}
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"invite_token": "short"},
+        {"invite_token": "x" * 43 + "."},
+        {"invite_token": "A" * 129},
+        {"invite_token": "A" * 43, "unexpected": True},
+    ],
+)
+def test_invite_accept_rejects_invalid_payloads(payload: dict[str, object]) -> None:
+    session = AsyncMock(spec=AsyncSession)
+    app = make_test_app(session)
+    app.dependency_overrides[require_authenticated_principal] = lambda: SimpleNamespace(
+        user=SimpleNamespace(id=uuid4())
+    )
+
+    response = post(app, "/api/v1/communities/invites/accept", payload)
+
+    assert response.status_code == 422
+    session.execute.assert_not_awaited()
 
 
 def test_community_creation_returns_only_public_fields(monkeypatch: pytest.MonkeyPatch) -> None:

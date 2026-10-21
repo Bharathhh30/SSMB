@@ -1,14 +1,23 @@
 import re
 import unicodedata
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.features.auth.security import create_one_time_token, hash_one_time_token
 from app.features.communities import repository
-from app.features.communities.models import Community, CommunityMembership
-from app.features.communities.schemas import CommunityCreate, CommunityUpdate
+from app.features.communities.models import Community, CommunityInvite, CommunityMembership
+from app.features.communities.schemas import (
+    CommunityCreate,
+    CommunityInviteRead,
+    CommunityUpdate,
+)
+
+COMMUNITY_INVITE_LIFETIME = timedelta(days=7)
+COMMUNITY_INVITE_CREATE_LIMIT = 10
+COMMUNITY_INVITE_ACCEPT_LIMIT = 20
 
 
 class CommunitySlugConflict(Exception):
@@ -29,6 +38,18 @@ class CommunityNotFound(Exception):
 
 class CommunityForbidden(Exception):
     """The authenticated caller is not allowed to manage the community."""
+
+
+class CommunityInviteConflict(Exception):
+    """The requested invite action conflicts with the invite or community state."""
+
+
+class CommunityInviteUnavailable(Exception):
+    """The invite is invalid, expired, revoked, or belongs to an unavailable community."""
+
+
+class CommunityInviteAlreadyUsed(Exception):
+    """The invite has already been accepted by another account."""
 
 
 async def get_public_community_with_member_count(
@@ -194,6 +215,206 @@ async def update_owned_community(
     for field in data.model_fields_set:
         setattr(community, field, getattr(data, field))
     await session.commit()
+    return community
+
+
+async def create_community_invite(
+    session: AsyncSession,
+    *,
+    slug: str,
+    owner_id: UUID,
+) -> tuple[CommunityInvite, str]:
+    community = await _get_locked_owned_community(
+        session,
+        slug=slug,
+        owner_id=owner_id,
+    )
+    now = datetime.now(UTC)
+    if community.access_type != "invite_only":
+        await session.rollback()
+        raise CommunityInviteConflict("Invites can only be created for invite-only communities")
+    if community.expires_at is not None and community.expires_at <= now:
+        await session.rollback()
+        raise CommunityInviteConflict("Expired communities cannot issue invites")
+
+    invite_expires_at = now + COMMUNITY_INVITE_LIFETIME
+    if community.expires_at is not None:
+        invite_expires_at = min(invite_expires_at, community.expires_at)
+    raw_token, token_hash = create_one_time_token()
+    invite = await repository.create_invite(
+        session,
+        community_id=community.id,
+        created_by_user_id=owner_id,
+        token_hash=token_hash,
+        created_at=now,
+        expires_at=invite_expires_at,
+    )
+    await session.commit()
+    return invite, raw_token
+
+
+async def list_community_invites(
+    session: AsyncSession,
+    *,
+    slug: str,
+    owner_id: UUID,
+    limit: int,
+    offset: int,
+) -> tuple[list[CommunityInviteRead], int]:
+    community = await repository.get_owned_community(session, slug=slug)
+    if community is None:
+        raise CommunityNotFound
+    if community.owner_id != owner_id:
+        raise CommunityForbidden
+
+    invites, total = await repository.list_community_invites(
+        session,
+        community_id=community.id,
+        limit=limit,
+        offset=offset,
+    )
+    now = datetime.now(UTC)
+    result = []
+    for invite in invites:
+        if invite.revoked_at is not None:
+            invite_status = "revoked"
+        elif invite.consumed_at is not None:
+            invite_status = "accepted"
+        elif invite.expires_at <= now or (
+            community.expires_at is not None and community.expires_at <= now
+        ):
+            invite_status = "expired"
+        else:
+            invite_status = "active"
+        result.append(
+            CommunityInviteRead(
+                invite_id=invite.id,
+                created_at=invite.created_at,
+                expires_at=invite.expires_at,
+                status=invite_status,
+            )
+        )
+    return result, total
+
+
+async def revoke_community_invite(
+    session: AsyncSession,
+    *,
+    slug: str,
+    invite_id: UUID,
+    owner_id: UUID,
+) -> None:
+    community = await _get_locked_owned_community(
+        session,
+        slug=slug,
+        owner_id=owner_id,
+    )
+    invite = await repository.get_community_invite(
+        session,
+        community_id=community.id,
+        invite_id=invite_id,
+        for_update=True,
+    )
+    if invite is None:
+        await session.rollback()
+        raise CommunityInviteUnavailable
+    if invite.consumed_at is not None:
+        await session.rollback()
+        raise CommunityInviteAlreadyUsed
+    if invite.revoked_at is not None:
+        await session.commit()
+        return
+
+    invite.revoked_at = datetime.now(UTC)
+    await session.commit()
+
+
+async def accept_community_invite(
+    session: AsyncSession,
+    *,
+    invite_token: str,
+    user_id: UUID,
+) -> tuple[CommunityMembership, bool]:
+    token_hash = hash_one_time_token(invite_token)
+    community_id = await repository.get_invite_community_id_by_token_hash(
+        session,
+        token_hash=token_hash,
+    )
+    if community_id is None:
+        await session.rollback()
+        raise CommunityInviteUnavailable
+
+    community = await repository.get_community_by_id_for_update(
+        session,
+        community_id=community_id,
+    )
+    invite = await repository.get_invite_by_token_hash(
+        session,
+        token_hash=token_hash,
+        for_update=True,
+    )
+    if community is None or invite is None:
+        await session.rollback()
+        raise CommunityInviteUnavailable
+
+    now = datetime.now(UTC)
+    if invite.revoked_at is not None or invite.expires_at <= now:
+        await session.rollback()
+        raise CommunityInviteUnavailable
+    if community.expires_at is not None and community.expires_at <= now:
+        await session.rollback()
+        raise CommunityInviteUnavailable
+
+    if invite.consumed_at is not None:
+        if invite.accepted_by_user_id != user_id:
+            await session.rollback()
+            raise CommunityInviteAlreadyUsed
+        existing_membership = await repository.get_membership(
+            session,
+            community_id=community.id,
+            user_id=user_id,
+        )
+        if existing_membership is None:
+            await session.rollback()
+            raise CommunityInviteAlreadyUsed
+        await session.commit()
+        return existing_membership, False
+
+    membership = await repository.get_membership(
+        session,
+        community_id=community.id,
+        user_id=user_id,
+    )
+    created = membership is None
+    if membership is None:
+        membership = await repository.add_member(
+            session,
+            community_id=community.id,
+            user_id=user_id,
+        )
+    invite.consumed_at = now
+    invite.accepted_by_user_id = user_id
+    await session.commit()
+    return membership, created
+
+
+async def _get_locked_owned_community(
+    session: AsyncSession,
+    *,
+    slug: str,
+    owner_id: UUID,
+) -> Community:
+    community = await repository.get_owned_community(
+        session,
+        slug=slug,
+        for_update=True,
+    )
+    if community is None:
+        await session.rollback()
+        raise CommunityNotFound
+    if community.owner_id != owner_id:
+        await session.rollback()
+        raise CommunityForbidden
     return community
 
 
