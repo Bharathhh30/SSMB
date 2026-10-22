@@ -12,7 +12,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Keep an active PR check alive while a newer PR event waits to run.
+  cancel-in-progress: ${{ github.event_name != 'pull_request' }}
 
 jobs:
   backend:
