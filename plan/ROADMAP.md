@@ -319,6 +319,7 @@ Must be resolved in the indicated phase; absence of a choice must not block plan
 | Community invites | **Approved:** owner-created, single-use, revocable token; maximum 7-day lifetime; verified signed-in acceptance; raw token shown once and hash-only persistence. | 3 |
 | Community name uniqueness | **Approved:** global, case-insensitive uniqueness after trimming; migration suffixes legacy duplicates while preserving internal IDs. | 3 |
 | Public resource identifiers | **Approved:** API responses and public slugs must not expose database primary keys; use independent public UUIDs and immutable public slugs after migration. | 3 |
+| Community roster privacy | **Approved (October 22, 2026):** only a community owner or moderator can view that community's member identities; public previews expose aggregate counts only; arbitrary users' cross-community membership histories remain private. | 3 |
 | Cloud provider, region, deployment target, budget | Compare managed container hosting, managed PostgreSQL, storage, backups, data residency, and egress cost after prototype signoff | 10 |
 | ORM and DB access | Validate SQLAlchemy async/sync approach, pooling, transaction boundaries, and migration tooling | 0 |
 | Email, push, object storage | Pick providers and define adapters, deliverability, costs, residency, and failure policy | 0/4/5 |
@@ -351,9 +352,10 @@ lists distinct topics with active open communities; Home and Discover handle
 topic loading/failure without blocking the all-communities view. The API
 intentionally does not return invite-only communities until a
 public-preview policy is decided. The backend now supports community creation,
-open join/leave, and owner-only metadata management; the Expo prototype remains
-frozen until the Backend Completion Gate. The development seed command is
-explicit and refuses to run outside `APP_ENV=development`.
+open join/leave, owner-only metadata management, self-membership discovery, and
+a paginated owner/moderator-only roster; the Expo prototype remains frozen
+until the Backend Completion Gate. The development seed command is explicit
+and refuses to run outside `APP_ENV=development`.
 
 The first GitHub Actions run is complete. Its backend/PostgreSQL job passed the
 Alembic migration, repository integration tests, and Docker image readiness
@@ -463,7 +465,11 @@ row confirmed slug rotation uses its separate public UUID while preserving the
 internal row ID. `GET /communities/mine` lets owners retrieve refreshed slugs,
 including for private communities. `GET /communities/memberships/me` lists only
 the authenticated user's own owner/member/moderator memberships; it does not
-provide arbitrary-user roster lookup. The full suite passed 101/101 tests with
-zero skips against isolated PostgreSQL 18. Migration `0008` was upgraded/
-downgraded/re-upgraded and Alembic found no model drift. Ruff lint and
-formatting checks passed.
+provide arbitrary-user roster lookup. The owner/moderator-only
+`GET /communities/{slug}/members` roster is paginated and returns only user
+public IDs, display names, roles, and join timestamps; non-managers cannot see
+member identities. The approved policy keeps public previews aggregate-only
+and arbitrary users' cross-community membership histories private. The full
+suite passed 102/102 tests with zero skips against isolated PostgreSQL 18.
+Migration `0008` was upgraded/downgraded/re-upgraded and Alembic found no model
+drift. Ruff lint and formatting checks passed.

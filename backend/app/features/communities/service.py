@@ -13,6 +13,7 @@ from app.features.communities.schemas import (
     CommunityCreate,
     CommunityInviteRead,
     CommunityRead,
+    CommunityRosterMemberRead,
     CommunityUpdate,
     MyCommunityMembershipRead,
 )
@@ -126,6 +127,44 @@ async def list_own_memberships(
             ),
         )
         for membership, community in memberships
+    ]
+    return items, total
+
+
+async def list_community_roster(
+    session: AsyncSession,
+    *,
+    slug: str,
+    requester_id: UUID,
+    limit: int,
+    offset: int,
+) -> tuple[list[CommunityRosterMemberRead], int]:
+    access = await repository.get_community_roster_access(
+        session,
+        slug=slug,
+        user_id=requester_id,
+    )
+    if access is None:
+        raise CommunityNotFound
+
+    community, requester_role = access
+    if community.owner_id != requester_id and requester_role != "moderator":
+        raise CommunityForbidden
+
+    memberships, total = await repository.list_community_roster(
+        session,
+        community_id=community.id,
+        limit=limit,
+        offset=offset,
+    )
+    items = [
+        CommunityRosterMemberRead(
+            user_public_id=user.public_id,
+            display_name=user.display_name,
+            role=membership.role,
+            joined_at=membership.joined_at,
+        )
+        for membership, user in memberships
     ]
     return items, total
 

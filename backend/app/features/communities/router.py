@@ -18,6 +18,7 @@ from app.features.communities.schemas import (
     CommunityMembershipRead,
     CommunityPage,
     CommunityRead,
+    CommunityRosterPage,
     CommunityUpdate,
     MyCommunityMembershipPage,
 )
@@ -463,6 +464,47 @@ async def get_my_communities(
         offset=offset,
     )
     return CommunityPage(items=communities, total=total, limit=limit, offset=offset)
+
+
+@router.get(
+    "/{slug}/members",
+    response_model=CommunityRosterPage,
+    summary="List a community roster for its owner or moderators",
+    description=(
+        "Only the community owner and its moderators can view member identities. "
+        "This endpoint does not expose a user's memberships across communities."
+    ),
+    responses={
+        403: {"description": "The authenticated user is not this community's owner or moderator."},
+        404: {"description": "No community exists with this slug."},
+    },
+)
+async def get_community_roster(
+    principal: AuthenticatedDependency,
+    session: DatabaseSession,
+    slug: Annotated[
+        str,
+        Path(min_length=1, max_length=140, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$"),
+    ],
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> CommunityRosterPage:
+    try:
+        items, total = await service.list_community_roster(
+            session,
+            slug=slug,
+            requester_id=principal.user.id,
+            limit=limit,
+            offset=offset,
+        )
+    except CommunityNotFound:
+        raise HTTPException(status_code=404, detail="Community not found") from None
+    except CommunityForbidden:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not authorized to view this community's member roster.",
+        ) from None
+    return CommunityRosterPage(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.get(

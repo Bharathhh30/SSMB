@@ -78,6 +78,11 @@ verified account. Neither request has a JSON body.
   account currently belongs to, whether as owner, moderator, or member. It
   returns only the caller's memberships; it does not accept another user's ID.
   Expired communities are included with `community_status: "expired"`.
+- `GET /api/v1/communities/{slug}/members` lists the current roster only to
+  that community's owner or moderators. It includes user public IDs, display
+  names, roles, and join timestamps, but never internal user IDs or email
+  addresses. A regular member or unrelated account receives `403`; an unknown
+  slug receives `404`. Public previews continue to show only `member_count`.
 - `GET /api/v1/communities/{slug}/manage` returns a community only to its owner,
   including an invite-only community that is hidden from public preview.
 - `PATCH /api/v1/communities/{slug}` updates only fields supplied in the body.

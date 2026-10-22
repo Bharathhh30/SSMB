@@ -1,6 +1,6 @@
 # Phase 3 — Communities, discovery, access, and roles
 
-**Status:** In progress — public discovery, authenticated community creation, open-community join/leave, owner read/update, and invite lifecycle are implemented and PostgreSQL-tested. Archiving and role actions remain.
+**Status:** In progress — public discovery, authenticated community creation, open-community join/leave, owner read/update, invite lifecycle, self-memberships, and owner/moderator roster reads are implemented and PostgreSQL-tested. Archiving, role assignment/removal, and ownership transfer remain.
 **Goal:** Make the core discover → join → participate journey work with enforceable community access rules.
 
 ## Backend-first sequencing
@@ -15,7 +15,7 @@ Gate.
 - Implement community lifecycle, topic taxonomy, public/private visibility, open/invite/request access, optional expiry, and owner controls.
 - Add search/filter/pagination and a safe public preview.
 - Implement join/leave, access requests if selected, shareable invite creation/revocation/acceptance, and invite abuse limits.
-- Add memberships, founder/moderator/member roles, moderator assignment/removal, ownership transfer, and member roster privacy.
+- Add memberships, founder/moderator/member roles, moderator assignment/removal, ownership transfer, and member roster privacy. **Approved roster rule (October 22, 2026):** only the community owner and its moderators can view member identities; public/non-member views retain aggregate counts only, and arbitrary users' cross-community membership histories stay private.
 - Add contract tests for discovery and all community mutations; include
   anonymous/member/founder/moderator cases, cross-community access, expiry,
   invite replay/revocation, duplicates, and concurrent membership changes.
@@ -74,6 +74,13 @@ frontend implementation before backend completion.
 - [x] PostgreSQL-test the self-membership route's caller scoping, owner/member
   roles, expired-community status, pagination completeness, and public-field
   response boundary.
+- [x] Add a paginated community-roster endpoint restricted to the owner and
+  moderators; include only user public IDs, display names, roles, and join
+  timestamps. Members, unrelated users, and other community owners receive
+  `403`; unknown communities return `404`.
+- [x] PostgreSQL-test roster authorization, invite-only/expired community
+  access for authorized roles, cross-community isolation, pagination, and
+  response-field allowlisting.
 - [x] Include the current owner/moderator/member total in the public community
   detail response without exposing member identities.
 - [x] Distinguish authenticated management denial (`403`) from a missing
@@ -85,14 +92,16 @@ frontend implementation before backend completion.
 - [x] Rate-limit invite creation and acceptance using the shared HMAC-backed
   PostgreSQL rate-limit store.
 - [ ] Define archive/deletion semantics before implementing lifecycle actions.
-- [ ] Implement moderator roles, ownership transfer, and private member-roster
-  access rules.
+- [ ] Implement owner-only moderator assignment/removal with an auditable role
+  history, then ownership transfer with owner-membership invariants.
+- [x] Keep arbitrary profile-to-community membership lookup private; the
+  cross-community membership endpoint is self-scoped only.
 
-Community deletion/archive semantics, access requests, moderator capabilities,
-and private roster visibility remain explicit policy/contract work for their
-respective endpoint slices. Invite policy is approved: owner-created,
-single-use, revocable tokens, expiring within seven days, accepted only by
-verified signed-in accounts.
+Community deletion/archive semantics, access requests, moderator assignment
+and action permissions, and ownership transfer remain explicit contract work
+for their respective endpoint slices. Invite policy is approved:
+owner-created, single-use, revocable tokens, expiring within seven days,
+accepted only by verified signed-in accounts.
 
 Open membership is available immediately. Invite-only communities can now
 receive owner-managed invitations; the Expo share-link UI remains deferred

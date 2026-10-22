@@ -1,10 +1,11 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.communities.models import Community, CommunityInvite, CommunityMembership
+from app.features.users.models import User
 
 PUBLIC_TOPIC_LIMIT = 50
 
@@ -231,6 +232,50 @@ async def list_user_memberships(
             CommunityMembership.joined_at.desc(),
             CommunityMembership.id.asc(),
         )
+        .limit(limit)
+        .offset(offset)
+    )
+    result = await session.execute(statement)
+    return [(row[0], row[1]) for row in result.all()], total or 0
+
+
+async def get_community_roster_access(
+    session: AsyncSession,
+    *,
+    slug: str,
+    user_id: UUID,
+) -> tuple[Community, str | None] | None:
+    statement = (
+        select(Community, CommunityMembership.role)
+        .outerjoin(
+            CommunityMembership,
+            and_(
+                CommunityMembership.community_id == Community.id,
+                CommunityMembership.user_id == user_id,
+            ),
+        )
+        .where(Community.slug == slug)
+    )
+    row = (await session.execute(statement)).one_or_none()
+    return (row[0], row[1]) if row is not None else None
+
+
+async def list_community_roster(
+    session: AsyncSession,
+    *,
+    community_id: UUID,
+    limit: int,
+    offset: int,
+) -> tuple[list[tuple[CommunityMembership, User]], int]:
+    filters = [CommunityMembership.community_id == community_id]
+    total = await session.scalar(
+        select(func.count()).select_from(CommunityMembership).where(*filters)
+    )
+    statement = (
+        select(CommunityMembership, User)
+        .join(User, User.id == CommunityMembership.user_id)
+        .where(*filters)
+        .order_by(CommunityMembership.joined_at.asc(), User.public_id.asc())
         .limit(limit)
         .offset(offset)
     )

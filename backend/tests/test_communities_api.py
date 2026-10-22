@@ -323,6 +323,7 @@ def test_owner_management_requires_authentication() -> None:
     read = get(app, "/api/v1/communities/study-circle/manage")
     mine = get(app, "/api/v1/communities/mine")
     memberships = get(app, "/api/v1/communities/memberships/me")
+    roster = get(app, "/api/v1/communities/study-circle/members")
     update = patch(
         app,
         "/api/v1/communities/study-circle",
@@ -330,12 +331,18 @@ def test_owner_management_requires_authentication() -> None:
     )
 
     assert (
-        read.status_code == mine.status_code == memberships.status_code == update.status_code == 401
+        read.status_code
+        == mine.status_code
+        == memberships.status_code
+        == roster.status_code
+        == update.status_code
+        == 401
     )
     assert (
         read.json()
         == mine.json()
         == memberships.json()
+        == roster.json()
         == update.json()
         == {"detail": "Authentication required"}
     )

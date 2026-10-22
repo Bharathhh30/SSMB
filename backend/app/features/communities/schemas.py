@@ -54,6 +54,20 @@ class MyCommunityMembershipPage(BaseModel):
     offset: int
 
 
+class CommunityRosterMemberRead(BaseModel):
+    user_public_id: UUID
+    display_name: str | None
+    role: Literal["owner", "moderator", "member"]
+    joined_at: datetime
+
+
+class CommunityRosterPage(BaseModel):
+    items: list[CommunityRosterMemberRead]
+    total: int
+    limit: int
+    offset: int
+
+
 class CommunityDetailRead(CommunityRead):
     member_count: int = Field(
         ge=0,

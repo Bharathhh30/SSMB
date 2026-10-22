@@ -30,7 +30,7 @@ voice, and engagement remain included.
 | 0 | Product decisions | Resolve only decisions needed before each affected API; define endpoint and permission contracts | Open; keep unresolved decisions explicit |
 | 1 | Engineering foundation | FastAPI, PostgreSQL, Alembic, local test database, health/readiness, API conventions, stable errors/logging | Foundation exists; endpoint edge coverage and repeatable DB test setup need work |
 | 2 | Identity and profile | Registration/sign-in, verification/recovery, sessions, profile, preferences, account controls | Auth and private self-profile endpoints implemented/tested; privacy, block, deletion/export APIs remain |
-| 3 | Communities and discovery | Create/read/update/archive, join/leave/requests, invites, memberships, roles, ownership, access rules | Discovery, create/manage, join/leave, single-use invites, owner lists, and self-membership list are implemented and PostgreSQL-tested; archive, moderator/ownership actions, and roster privacy remain |
+| 3 | Communities and discovery | Create/read/update/archive, join/leave/requests, invites, memberships, roles, ownership, access rules | Discovery, create/manage, join/leave, single-use invites, owner/self-membership lists, and owner/moderator roster reads are implemented and PostgreSQL-tested; archive, role assignment/removal, and ownership transfer remain |
 | 4 | Content and files | Posts, links, saved items, file metadata, upload/download authorization and storage adapter | Not implemented; storage and retention decisions remain open |
 | 5 | Messaging and notifications | Conversations, messages, read cursors, notification inbox/outbox, delivery adapters | Not implemented; realtime and push decisions remain open |
 | 6 | Scheduling and reservations | Events, RSVP, resource availability/reservation, reminder scheduling | Not implemented; reservation semantics remain open |
@@ -99,6 +99,7 @@ reason rather than silently omitting it.
 | `GET /api/v1/communities/{slug}/manage` | Community owner reads their community, including invite-only or expired records; non-owner gets 403 and unknown slug gets 404 | Anonymous, unknown slug, cross-owner status/message, owner/private-field response allowlist |
 | `PATCH /api/v1/communities/{slug}` | Owner updates name, topic, description, access type, or expiry; slug remains stable; non-owner gets 403 and unknown slug gets 404 | Anonymous, non-owner/member status/message, blank/null/oversized fields, empty patch, extra fields, invalid expiry, explicit expiry clear, concurrent writes |
 | `GET /api/v1/communities/memberships/me` | Authenticated caller lists their own current membership records, including owned communities; returns public community data and role | Anonymous, bounded pagination, ordering, expired-community status, no arbitrary user lookup or internal ID leakage |
+| `GET /api/v1/communities/{slug}/members` | Community owner or moderator lists the current roster; returns user public IDs, display names, roles, and join times only | Anonymous/member/unrelated owner denial, unknown slug, private/expired owner access, cross-community isolation, pagination, no email/internal ID leakage |
 | `GET /api/v1/profile/me` | Authenticated caller's public ID, display name, and private interests | Missing/expired/revoked auth, no internal ID/email/hash leakage, empty interests |
 | `PATCH /api/v1/profile/me` | Update caller's display name; add/remove private interests | Blank/null/unknown/oversized/duplicate values, atomic add/remove behavior, clearing interests |
 
@@ -243,3 +244,19 @@ is a client of the API; it never connects directly to PostgreSQL.
   isolated PostgreSQL 18 container: **101 passed, 0 skipped**. The container
   had no persistent volume and was removed after the run; the developer's
   local Compose database was not used or modified.
+
+## 9. Community roster contract (October 22, 2026)
+
+- **Approved privacy rule:** only a community owner or moderator may view that
+  community's member identities. Public previews continue to expose the
+  aggregate member count, and no endpoint reveals all communities another
+  person belongs to.
+- `GET /api/v1/communities/{slug}/members` is paginated and limited to
+  `user_public_id`, `display_name`, `role`, and `joined_at`. It is available for
+  invite-only and expired communities to authorized community managers.
+- Owner/moderator access, member and cross-community denials, unknown-community
+  behavior, pagination, and response allowlisting passed the isolated
+  PostgreSQL 18 integration suite. Full suite: **102 passed, 0 skipped**.
+- No schema migration was needed. Moderator assignment/removal and ownership
+  transfer are still separate work; moderators cannot yet be assigned through
+  an API.
