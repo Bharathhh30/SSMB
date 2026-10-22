@@ -30,7 +30,7 @@ voice, and engagement remain included.
 | 0 | Product decisions | Resolve only decisions needed before each affected API; define endpoint and permission contracts | Open; keep unresolved decisions explicit |
 | 1 | Engineering foundation | FastAPI, PostgreSQL, Alembic, local test database, health/readiness, API conventions, stable errors/logging | Foundation exists; endpoint edge coverage and repeatable DB test setup need work |
 | 2 | Identity and profile | Registration/sign-in, verification/recovery, sessions, profile, preferences, account controls | Auth and private self-profile endpoints implemented/tested; privacy, block, deletion/export APIs remain |
-| 3 | Communities and discovery | Create/read/update/archive, join/leave/requests, invites, memberships, roles, ownership, access rules | Public read-only discovery exists; write and membership APIs are absent |
+| 3 | Communities and discovery | Create/read/update/archive, join/leave/requests, invites, memberships, roles, ownership, access rules | Discovery, create/manage, join/leave, single-use invites, owner lists, and self-membership list are implemented and PostgreSQL-tested; archive, moderator/ownership actions, and roster privacy remain |
 | 4 | Content and files | Posts, links, saved items, file metadata, upload/download authorization and storage adapter | Not implemented; storage and retention decisions remain open |
 | 5 | Messaging and notifications | Conversations, messages, read cursors, notification inbox/outbox, delivery adapters | Not implemented; realtime and push decisions remain open |
 | 6 | Scheduling and reservations | Events, RSVP, resource availability/reservation, reminder scheduling | Not implemented; reservation semantics remain open |
@@ -229,3 +229,17 @@ vertical slices. Generate or review typed API contracts, connect one complete
 user journey at a time, and test loading, empty, error, offline,
 permission-denied, and retry behavior against the real local API. The frontend
 is a client of the API; it never connects directly to PostgreSQL.
+
+## 8. Community membership contract hardening (2026-10-22)
+
+- PostgreSQL integration coverage now verifies that
+  `GET /api/v1/communities/memberships/me` returns only the authenticated
+  caller's memberships, including owner and member roles and memberships for
+  expired communities.
+- Coverage also verifies active/expired status, page totals, non-overlapping
+  pages that account for the full result set, and omission of internal
+  membership/community IDs.
+- Alembic `upgrade head` and the complete backend suite passed against a fresh,
+  isolated PostgreSQL 18 container: **101 passed, 0 skipped**. The container
+  had no persistent volume and was removed after the run; the developer's
+  local Compose database was not used or modified.

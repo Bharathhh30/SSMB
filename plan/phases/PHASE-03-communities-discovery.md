@@ -71,6 +71,9 @@ frontend implementation before backend completion.
   for private/expired communities without exposing internal primary keys.
 - [x] Add a self-only paginated membership list covering owner, moderator, and
   member roles; do not expose arbitrary users' membership graphs.
+- [x] PostgreSQL-test the self-membership route's caller scoping, owner/member
+  roles, expired-community status, pagination completeness, and public-field
+  response boundary.
 - [x] Include the current owner/moderator/member total in the public community
   detail response without exposing member identities.
 - [x] Distinguish authenticated management denial (`403`) from a missing

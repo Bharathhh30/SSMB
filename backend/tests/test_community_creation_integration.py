@@ -32,6 +32,7 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
         joiner_id = uuid4()
         created_public_ids: list[UUID] = []
         expired_community_id = uuid4()
+        expired_membership_id = uuid4()
         suffix = uuid4().hex
         engine = create_async_engine(TEST_DATABASE_URL)
         session_factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -45,16 +46,24 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
                     ]
                 )
                 await session.flush()
-                session.add(
-                    Community(
-                        id=expired_community_id,
-                        owner_id=owner_id,
-                        name="Expired community",
-                        slug=f"expired-{suffix}",
-                        topic="Testing",
-                        access_type="open",
-                        expires_at=datetime.now(UTC) - timedelta(minutes=1),
-                    )
+                session.add_all(
+                    [
+                        Community(
+                            id=expired_community_id,
+                            owner_id=owner_id,
+                            name=f"Expired community {suffix}",
+                            slug=f"expired-{suffix}",
+                            topic="Testing",
+                            access_type="open",
+                            expires_at=datetime.now(UTC) - timedelta(minutes=1),
+                        ),
+                        CommunityMembership(
+                            id=expired_membership_id,
+                            community_id=expired_community_id,
+                            user_id=owner_id,
+                            role="owner",
+                        ),
+                    ]
                 )
                 await session.commit()
 
@@ -146,6 +155,12 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
                     expired_join = await client.post(f"/api/v1/communities/expired-{suffix}/join")
                     active_user_id["value"] = owner_id
                     owner_memberships = await client.get("/api/v1/communities/memberships/me")
+                    owner_memberships_first_page = await client.get(
+                        "/api/v1/communities/memberships/me?limit=2&offset=0"
+                    )
+                    owner_memberships_second_page = await client.get(
+                        "/api/v1/communities/memberships/me?limit=2&offset=2"
+                    )
                     unknown_owner_view = await client.get(
                         "/api/v1/communities/unknown-community/manage"
                     )
@@ -213,8 +228,39 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
             assert "id" not in joined_communities.json()["items"][0]
             assert "community_id" not in joined_communities.json()["items"][0]
             assert owner_memberships.status_code == 200
-            assert owner_memberships.json()["total"] == 3
+            assert owner_memberships.json()["total"] == 4
             assert all(item["role"] == "owner" for item in owner_memberships.json()["items"])
+            assert {item["community"]["slug"] for item in owner_memberships.json()["items"]} == {
+                f"expired-{suffix}",
+                first_slug,
+                second_slug,
+                concurrent_slug,
+            }
+            assert (
+                next(
+                    item
+                    for item in owner_memberships.json()["items"]
+                    if item["community"]["slug"] == f"expired-{suffix}"
+                )["community_status"]
+                == "expired"
+            )
+            assert owner_memberships_first_page.status_code == 200
+            assert owner_memberships_second_page.status_code == 200
+            assert owner_memberships_first_page.json()["total"] == 4
+            assert owner_memberships_second_page.json()["total"] == 4
+            first_membership_page_slugs = {
+                item["community"]["slug"] for item in owner_memberships_first_page.json()["items"]
+            }
+            second_membership_page_slugs = {
+                item["community"]["slug"] for item in owner_memberships_second_page.json()["items"]
+            }
+            assert first_membership_page_slugs.isdisjoint(second_membership_page_slugs)
+            assert first_membership_page_slugs | second_membership_page_slugs == {
+                f"expired-{suffix}",
+                first_slug,
+                second_slug,
+                concurrent_slug,
+            }
             assert second_data["access_type"] == "invite_only"
             assert "id" not in first_data
             assert "id" not in second_data
