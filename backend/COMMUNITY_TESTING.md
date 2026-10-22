@@ -21,6 +21,14 @@ Expected: `201 Created`, with a generated URL-safe `slug`. Save that slug for
 the membership examples. The first creator is persisted as the `owner`.
 The public preview endpoint returns `member_count`, including the owner and any
 moderators or members.
+Community display names are globally unique after trimming and ignoring case.
+Submitting the same name again returns `409 Conflict`; choose a distinct name
+instead of creating another confusing copy.
+
+When you apply the new database migration, existing duplicate names are repaired
+deterministically: the oldest keeps its current name, later duplicates receive
+numeric suffixes, and existing unique names are preserved. Community IDs and
+slugs are unchanged.
 
 ## Create an invite-only community
 

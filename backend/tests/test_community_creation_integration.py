@@ -88,10 +88,18 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
                     initial_public_preview = await client.get(
                         f"/api/v1/communities/{first_data['slug']}"
                     )
+                    duplicate_name = await client.post(
+                        "/api/v1/communities",
+                        json={
+                            "name": f" study circle {suffix[:8].upper()} ",
+                            "topic": "Another topic",
+                            "access_type": "invite_only",
+                        },
+                    )
                     second = await client.post(
                         "/api/v1/communities",
                         json={
-                            "name": f"Study Circle {suffix[:8]}",
+                            "name": f"Private Circle {suffix[:8]}",
                             "topic": "Biology",
                             "access_type": "invite_only",
                         },
@@ -99,6 +107,23 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
                     assert second.status_code == 201
                     second_data = second.json()
                     created_ids.append(UUID(second_data["id"]))
+                    concurrent_creations = await asyncio.gather(
+                        *[
+                            client.post(
+                                "/api/v1/communities",
+                                json={
+                                    "name": f"Concurrent Group {suffix[:8]}",
+                                    "topic": "Concurrency",
+                                    "access_type": "open",
+                                },
+                            )
+                            for _ in range(2)
+                        ]
+                    )
+                    successful_creation = next(
+                        response for response in concurrent_creations if response.status_code == 201
+                    )
+                    created_ids.append(UUID(successful_creation.json()["id"]))
                     active_user_id["value"] = joiner_id
                     concurrent_joins = await asyncio.gather(
                         client.post(f"/api/v1/communities/study-circle-{suffix[:8]}/join"),
@@ -161,11 +186,21 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
 
             assert first.status_code == 201
             assert second.status_code == 201
+            assert duplicate_name.status_code == 409
+            assert duplicate_name.json() == {
+                "detail": "A community with this name already exists. Choose a different name."
+            }
+            assert sorted(response.status_code for response in concurrent_creations) == [201, 409]
+            conflicting_creation = next(
+                response for response in concurrent_creations if response.status_code == 409
+            )
+            assert conflicting_creation.json() == {
+                "detail": "A community with this name already exists. Choose a different name."
+            }
             assert initial_public_preview.status_code == 200
             assert initial_public_preview.json()["member_count"] == 1
             assert first_data["slug"] == f"study-circle-{suffix[:8]}"
-            assert second_data["slug"].startswith(f"study-circle-{suffix[:8]}-")
-            assert first_data["slug"] != second_data["slug"]
+            assert second_data["slug"] == f"private-circle-{suffix[:8]}"
             assert second_data["access_type"] == "invite_only"
             assert "owner_id" not in first_data
             assert sorted(response.status_code for response in concurrent_joins) == [200, 201], [
@@ -214,10 +249,10 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
                     )
                 )
                 rows = list(memberships.all())
-                assert len(rows) == 3
-                assert sum(row.user_id == owner_id for row in rows) == 2
+                assert len(rows) == 4
+                assert sum(row.user_id == owner_id for row in rows) == 3
                 assert sum(row.user_id == joiner_id for row in rows) == 1
-                assert sum(row.role == "owner" for row in rows) == 2
+                assert sum(row.role == "owner" for row in rows) == 3
 
             with pytest.raises(IntegrityError):
                 async with session_factory() as session:
@@ -226,6 +261,19 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
                             community_id=created_ids[0],
                             user_id=owner_id,
                             role="member",
+                        )
+                    )
+                    await session.flush()
+
+            with pytest.raises(IntegrityError):
+                async with session_factory() as session:
+                    session.add(
+                        Community(
+                            owner_id=owner_id,
+                            name=f" RENAMED CIRCLE {suffix[:8].upper()} ",
+                            slug=f"name-collision-{suffix}",
+                            topic="Another topic",
+                            access_type="open",
                         )
                     )
                     await session.flush()

@@ -24,6 +24,10 @@ class CommunitySlugConflict(Exception):
     """The generated public slug collided with another community."""
 
 
+class CommunityNameConflict(Exception):
+    """A community already uses the normalized display name."""
+
+
 class CommunityNotJoinable(Exception):
     """The community does not exist or cannot be joined by this caller."""
 
@@ -89,6 +93,10 @@ async def create_community(
     owner_id: UUID,
     data: CommunityCreate,
 ) -> Community:
+    if await repository.community_name_exists(session, name=data.name):
+        await session.rollback()
+        raise CommunityNameConflict
+
     base_slug = _slugify(data.name)
     slug = base_slug
     if await repository.community_slug_exists(session, slug=slug):
@@ -109,7 +117,11 @@ async def create_community(
         return community
     except IntegrityError as error:
         await session.rollback()
+        if _is_unique_violation(error, "uq_communities_normalized_name"):
+            raise CommunityNameConflict from error
         if _is_slug_unique_conflict(error):
+            if await repository.community_name_exists(session, name=data.name):
+                raise CommunityNameConflict from error
             raise CommunitySlugConflict from error
         raise
 
@@ -430,11 +442,15 @@ def _with_unique_suffix(base_slug: str) -> str:
 
 
 def _is_slug_unique_conflict(error: Exception) -> bool:
+    return _is_unique_violation(error, "uq_communities_slug")
+
+
+def _is_unique_violation(error: Exception, constraint_name: str) -> bool:
     current: object | None = error
     while current is not None:
         if (
             getattr(current, "sqlstate", None) == "23505"
-            and getattr(current, "constraint_name", None) == "uq_communities_slug"
+            and getattr(current, "constraint_name", None) == constraint_name
         ):
             return True
         current = getattr(current, "orig", None) or getattr(current, "__cause__", None)

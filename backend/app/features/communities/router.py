@@ -25,6 +25,7 @@ from app.features.communities.service import (
     CommunityInviteAlreadyUsed,
     CommunityInviteConflict,
     CommunityInviteUnavailable,
+    CommunityNameConflict,
     CommunityNotFound,
     CommunityNotJoinable,
     CommunityOwnerCannotLeave,
@@ -40,6 +41,9 @@ DatabaseSession = Annotated[AsyncSession, Depends(get_database_session)]
     response_model=CommunityRead,
     status_code=status.HTTP_201_CREATED,
     summary="Create a community",
+    responses={
+        409: {"description": "A community already uses this name or its generated URL collided."}
+    },
 )
 async def create_community(
     data: CommunityCreate,
@@ -52,6 +56,11 @@ async def create_community(
             owner_id=principal.user.id,
             data=data,
         )
+    except CommunityNameConflict:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A community with this name already exists. Choose a different name.",
+        ) from None
     except CommunitySlugConflict:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

@@ -1,6 +1,6 @@
 from alembic.config import Config
 from alembic.script import ScriptDirectory
-from sqlalchemy import CheckConstraint, UniqueConstraint
+from sqlalchemy import CheckConstraint, Index, UniqueConstraint
 
 import app.db.models as _models  # noqa: F401
 from app.db.base import Base
@@ -24,6 +24,10 @@ def test_initial_models_register_user_and_community_tables() -> None:
     assert any(
         isinstance(constraint, UniqueConstraint) and constraint.name == "uq_communities_slug"
         for constraint in communities.constraints
+    )
+    assert any(
+        isinstance(index, Index) and index.name == "uq_communities_normalized_name" and index.unique
+        for index in communities.indexes
     )
     assert communities.c.expires_at.nullable is True
     memberships = Base.metadata.tables["community_memberships"]
@@ -58,10 +62,10 @@ def test_initial_models_register_user_and_community_tables() -> None:
     )
 
 
-def test_community_invite_migration_is_the_single_head() -> None:
+def test_unique_community_name_migration_is_the_single_head() -> None:
     script = ScriptDirectory.from_config(Config("alembic.ini"))
 
-    assert script.get_heads() == ["0006_community_invites"]
+    assert script.get_heads() == ["0007_unique_community_names"]
     assert (
         script.get_revision("0004_private_user_interests").down_revision == "0003_auth_rate_limits"
     )
@@ -71,4 +75,7 @@ def test_community_invite_migration_is_the_single_head() -> None:
     )
     assert (
         script.get_revision("0006_community_invites").down_revision == "0005_community_memberships"
+    )
+    assert (
+        script.get_revision("0007_unique_community_names").down_revision == "0006_community_invites"
     )

@@ -107,13 +107,13 @@ def test_discovery_filters_private_and_expired_rows_and_paginates() -> None:
                             Community(
                                 id=community_id,
                                 owner_id=owner_id,
-                                name=f"Stable {suffix}",
+                                name=f"Stable {suffix} {index}",
                                 slug=f"stable-{suffix}-{index}",
                                 topic="Stable ordering",
                                 description="Equal names must still paginate deterministically.",
                                 access_type="open",
                             )
-                            for index, community_id in enumerate(reversed(stable_ids))
+                            for index, community_id in enumerate(stable_ids)
                         ],
                     ]
                 )

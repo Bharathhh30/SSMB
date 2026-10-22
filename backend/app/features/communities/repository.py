@@ -99,6 +99,14 @@ async def community_slug_exists(session: AsyncSession, *, slug: str) -> bool:
     return bool(await session.scalar(select(Community.id).where(Community.slug == slug)))
 
 
+async def community_name_exists(session: AsyncSession, *, name: str) -> bool:
+    normalized_name = func.lower(func.btrim(name))
+    statement = select(Community.id).where(
+        func.lower(func.btrim(Community.name)) == normalized_name
+    )
+    return bool(await session.scalar(statement))
+
+
 async def create_community(
     session: AsyncSession,
     *,

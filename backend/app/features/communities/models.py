@@ -10,6 +10,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    column,
     func,
     text,
 )
@@ -31,6 +32,11 @@ class Community(Base):
         UniqueConstraint("slug", name="uq_communities_slug"),
         Index("ix_communities_owner_id", "owner_id"),
         Index("ix_communities_topic", "topic"),
+        Index(
+            "uq_communities_normalized_name",
+            func.lower(func.btrim(column("name"))),
+            unique=True,
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)

@@ -51,6 +51,9 @@ frontend implementation before backend completion.
 - [x] Return an allowlisted community response without exposing the owner ID.
 - [x] Test anonymous requests, request validation boundaries, duplicate-name
   slugs, and persisted founder membership against PostgreSQL.
+- [x] Enforce globally unique community names after trimming and ignoring case;
+  reject duplicates with `409` and repair historical duplicates in migration
+  `0007_unique_community_names` without changing IDs or slugs.
 - [x] Implement idempotent joins for active open communities and member leave;
   serialize concurrent joins using a community row lock and enforce the
   membership uniqueness constraint in PostgreSQL.
