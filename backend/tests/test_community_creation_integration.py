@@ -84,10 +84,9 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
                     )
                     assert first.status_code == 201
                     first_data = first.json()
+                    first_slug = first_data["slug"]
                     created_ids.append(UUID(first_data["id"]))
-                    initial_public_preview = await client.get(
-                        f"/api/v1/communities/{first_data['slug']}"
-                    )
+                    initial_public_preview = await client.get(f"/api/v1/communities/{first_slug}")
                     duplicate_name = await client.post(
                         "/api/v1/communities",
                         json={
@@ -106,6 +105,7 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
                     )
                     assert second.status_code == 201
                     second_data = second.json()
+                    second_slug = second_data["slug"]
                     created_ids.append(UUID(second_data["id"]))
                     concurrent_creations = await asyncio.gather(
                         *[
@@ -123,30 +123,20 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
                     successful_creation = next(
                         response for response in concurrent_creations if response.status_code == 201
                     )
-                    created_ids.append(UUID(successful_creation.json()["id"]))
+                    concurrent_data = successful_creation.json()
+                    concurrent_slug = concurrent_data["slug"]
+                    created_ids.append(UUID(concurrent_data["id"]))
                     active_user_id["value"] = joiner_id
                     concurrent_joins = await asyncio.gather(
-                        client.post(f"/api/v1/communities/study-circle-{suffix[:8]}/join"),
-                        client.post(f"/api/v1/communities/study-circle-{suffix[:8]}/join"),
+                        client.post(f"/api/v1/communities/{first_slug}/join"),
+                        client.post(f"/api/v1/communities/{first_slug}/join"),
                     )
-                    private_join = await client.post(
-                        f"/api/v1/communities/{second.json()['slug']}/join"
-                    )
-                    private_leave = await client.delete(
-                        f"/api/v1/communities/{second.json()['slug']}/leave"
-                    )
-                    first_leave = await client.delete(
-                        f"/api/v1/communities/study-circle-{suffix[:8]}/leave"
-                    )
-                    repeated_leave = await client.delete(
-                        f"/api/v1/communities/study-circle-{suffix[:8]}/leave"
-                    )
-                    rejoin = await client.post(
-                        f"/api/v1/communities/study-circle-{suffix[:8]}/join"
-                    )
-                    joined_public_preview = await client.get(
-                        f"/api/v1/communities/study-circle-{suffix[:8]}"
-                    )
+                    private_join = await client.post(f"/api/v1/communities/{second_slug}/join")
+                    private_leave = await client.delete(f"/api/v1/communities/{second_slug}/leave")
+                    first_leave = await client.delete(f"/api/v1/communities/{first_slug}/leave")
+                    repeated_leave = await client.delete(f"/api/v1/communities/{first_slug}/leave")
+                    rejoin = await client.post(f"/api/v1/communities/{first_slug}/join")
+                    joined_public_preview = await client.get(f"/api/v1/communities/{first_slug}")
                     expired_join = await client.post(f"/api/v1/communities/expired-{suffix}/join")
                     active_user_id["value"] = owner_id
                     unknown_owner_view = await client.get(
@@ -156,26 +146,20 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
                         "/api/v1/communities/unknown-community",
                         json={"name": "No such community"},
                     )
-                    owner_leave = await client.delete(
-                        f"/api/v1/communities/study-circle-{suffix[:8]}/leave"
-                    )
+                    owner_leave = await client.delete(f"/api/v1/communities/{first_slug}/leave")
                     private_owner_view = await client.get(
-                        f"/api/v1/communities/{second_data['slug']}/manage"
+                        f"/api/v1/communities/{second_slug}/manage"
                     )
-                    private_public_view = await client.get(
-                        f"/api/v1/communities/{second_data['slug']}"
-                    )
+                    private_public_view = await client.get(f"/api/v1/communities/{second_slug}")
                     active_user_id["value"] = joiner_id
-                    member_owner_view = await client.get(
-                        f"/api/v1/communities/study-circle-{suffix[:8]}/manage"
-                    )
+                    member_owner_view = await client.get(f"/api/v1/communities/{first_slug}/manage")
                     member_edit = await client.patch(
-                        f"/api/v1/communities/study-circle-{suffix[:8]}",
+                        f"/api/v1/communities/{first_slug}",
                         json={"name": "Unauthorized rename"},
                     )
                     active_user_id["value"] = owner_id
                     owner_edit = await client.patch(
-                        f"/api/v1/communities/study-circle-{suffix[:8]}",
+                        f"/api/v1/communities/{first_slug}",
                         json={
                             "name": f"Renamed Circle {suffix[:8]}",
                             "topic": "Updated biology",
@@ -199,8 +183,13 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
             }
             assert initial_public_preview.status_code == 200
             assert initial_public_preview.json()["member_count"] == 1
-            assert first_data["slug"] == f"study-circle-{suffix[:8]}"
-            assert second_data["slug"] == f"private-circle-{suffix[:8]}"
+            assert first_slug == f"study-circle-{suffix[:8]}-{first_data['id'].replace('-', '')}"
+            assert (
+                second_slug == f"private-circle-{suffix[:8]}-{second_data['id'].replace('-', '')}"
+            )
+            assert concurrent_slug == (
+                f"concurrent-group-{suffix[:8]}-{concurrent_data['id'].replace('-', '')}"
+            )
             assert second_data["access_type"] == "invite_only"
             assert "owner_id" not in first_data
             assert sorted(response.status_code for response in concurrent_joins) == [200, 201], [

@@ -95,10 +95,6 @@ async def get_public_community_with_member_count(
     return (row[0], row[1]) if row is not None else None
 
 
-async def community_slug_exists(session: AsyncSession, *, slug: str) -> bool:
-    return bool(await session.scalar(select(Community.id).where(Community.slug == slug)))
-
-
 async def community_name_exists(session: AsyncSession, *, name: str) -> bool:
     normalized_name = func.lower(func.btrim(name))
     statement = select(Community.id).where(
@@ -110,6 +106,7 @@ async def community_name_exists(session: AsyncSession, *, name: str) -> bool:
 async def create_community(
     session: AsyncSession,
     *,
+    community_id: UUID,
     owner_id: UUID,
     name: str,
     slug: str,
@@ -119,7 +116,7 @@ async def create_community(
     expires_at: datetime | None,
 ) -> Community:
     community = Community(
-        id=uuid4(),
+        id=community_id,
         owner_id=owner_id,
         name=name,
         slug=slug,

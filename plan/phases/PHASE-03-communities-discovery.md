@@ -54,6 +54,8 @@ frontend implementation before backend completion.
 - [x] Enforce globally unique community names after trimming and ignoring case;
   reject duplicates with `409` and repair historical duplicates in migration
   `0007_unique_community_names` without changing IDs or slugs.
+- [x] Make each newly created slug a readable normalized-name prefix plus the
+  full community UUID, while preserving existing slugs for compatibility.
 - [x] Implement idempotent joins for active open communities and member leave;
   serialize concurrent joins using a community row lock and enforce the
   membership uniqueness constraint in PostgreSQL.

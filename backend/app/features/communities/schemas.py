@@ -9,7 +9,9 @@ class CommunityRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    slug: str
+    slug: str = Field(
+        description="Stable URL-safe identifier; new slugs include the full community UUID suffix."
+    )
     name: str
     topic: str
     description: str

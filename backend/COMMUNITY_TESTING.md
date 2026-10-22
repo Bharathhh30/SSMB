@@ -19,6 +19,9 @@ The same endpoints can be called from a terminal with `curl.exe`.
 
 Expected: `201 Created`, with a generated URL-safe `slug`. Save that slug for
 the membership examples. The first creator is persisted as the `owner`.
+New slugs use a normalized readable name followed by the full community UUID
+in hexadecimal (for example, `gate-study-circle-<32-hex-id>`). That suffix
+makes the slug distinct even when different names normalize to the same text.
 The public preview endpoint returns `member_count`, including the owner and any
 moderators or members.
 Community display names are globally unique after trimming and ignoring case.

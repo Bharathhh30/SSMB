@@ -453,5 +453,7 @@ pre-migration PostgreSQL test kept the original `California` and existing
 `California (2)` rows intact, renamed conflicting rows with collision-free
 numeric suffixes, preserved every slug, and found no duplicate normalized
 names afterward. Concurrent create tests also confirmed one success and one
-`409`. The full suite passed 101/101 tests with zero skips; downgrade/
-re-upgrade, Alembic drift, Ruff, and formatting checks passed.
+`409`. New slugs now combine a readable normalized-name prefix with the full
+community UUID; existing slug values are left untouched. The full suite passed
+101/101 tests with zero skips; downgrade/re-upgrade, Alembic drift, Ruff, and
+formatting checks passed.

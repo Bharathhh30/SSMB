@@ -97,14 +97,13 @@ async def create_community(
         await session.rollback()
         raise CommunityNameConflict
 
-    base_slug = _slugify(data.name)
-    slug = base_slug
-    if await repository.community_slug_exists(session, slug=slug):
-        slug = _with_unique_suffix(base_slug)
+    community_id = uuid4()
+    slug = _community_slug(data.name, community_id)
 
     try:
         community = await repository.create_community(
             session,
+            community_id=community_id,
             owner_id=owner_id,
             name=data.name,
             slug=slug,
@@ -433,12 +432,11 @@ async def _get_locked_owned_community(
 def _slugify(value: str) -> str:
     ascii_value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode()
     slug = re.sub(r"[^a-z0-9]+", "-", ascii_value.lower()).strip("-")
-    return slug[:140].rstrip("-") or "community"
+    return slug[:107].rstrip("-") or "community"
 
 
-def _with_unique_suffix(base_slug: str) -> str:
-    suffix = uuid4().hex[:8]
-    return f"{base_slug[: 140 - len(suffix) - 1].rstrip('-')}-{suffix}"
+def _community_slug(value: str, community_id: UUID) -> str:
+    return f"{_slugify(value)}-{community_id.hex}"
 
 
 def _is_slug_unique_conflict(error: Exception) -> bool:
