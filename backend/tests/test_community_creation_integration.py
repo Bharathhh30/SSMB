@@ -30,7 +30,7 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
     async def run() -> None:
         owner_id = uuid4()
         joiner_id = uuid4()
-        created_ids: list[UUID] = []
+        created_public_ids: list[UUID] = []
         expired_community_id = uuid4()
         suffix = uuid4().hex
         engine = create_async_engine(TEST_DATABASE_URL)
@@ -85,7 +85,8 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
                     assert first.status_code == 201
                     first_data = first.json()
                     first_slug = first_data["slug"]
-                    created_ids.append(UUID(first_data["id"]))
+                    first_public_id = UUID(first_data["public_id"])
+                    created_public_ids.append(first_public_id)
                     initial_public_preview = await client.get(f"/api/v1/communities/{first_slug}")
                     duplicate_name = await client.post(
                         "/api/v1/communities",
@@ -106,7 +107,8 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
                     assert second.status_code == 201
                     second_data = second.json()
                     second_slug = second_data["slug"]
-                    created_ids.append(UUID(second_data["id"]))
+                    second_public_id = UUID(second_data["public_id"])
+                    created_public_ids.append(second_public_id)
                     concurrent_creations = await asyncio.gather(
                         *[
                             client.post(
@@ -125,8 +127,11 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
                     )
                     concurrent_data = successful_creation.json()
                     concurrent_slug = concurrent_data["slug"]
-                    created_ids.append(UUID(concurrent_data["id"]))
+                    concurrent_public_id = UUID(concurrent_data["public_id"])
+                    created_public_ids.append(concurrent_public_id)
+                    owned_communities = await client.get("/api/v1/communities/mine")
                     active_user_id["value"] = joiner_id
+                    no_owned_communities = await client.get("/api/v1/communities/mine")
                     concurrent_joins = await asyncio.gather(
                         client.post(f"/api/v1/communities/{first_slug}/join"),
                         client.post(f"/api/v1/communities/{first_slug}/join"),
@@ -183,14 +188,25 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
             }
             assert initial_public_preview.status_code == 200
             assert initial_public_preview.json()["member_count"] == 1
-            assert first_slug == f"study-circle-{suffix[:8]}-{first_data['id'].replace('-', '')}"
-            assert (
-                second_slug == f"private-circle-{suffix[:8]}-{second_data['id'].replace('-', '')}"
-            )
-            assert concurrent_slug == (
-                f"concurrent-group-{suffix[:8]}-{concurrent_data['id'].replace('-', '')}"
-            )
+            assert first_slug == f"study-circle-{suffix[:8]}-{first_public_id.hex}"
+            assert second_slug == f"private-circle-{suffix[:8]}-{second_public_id.hex}"
+            assert concurrent_slug == (f"concurrent-group-{suffix[:8]}-{concurrent_public_id.hex}")
+            assert owned_communities.status_code == 200
+            assert owned_communities.json()["total"] == 4
+            assert {item["slug"] for item in owned_communities.json()["items"]} == {
+                f"expired-{suffix}",
+                first_slug,
+                second_slug,
+                concurrent_slug,
+            }
+            assert all("id" not in item for item in owned_communities.json()["items"])
+            assert no_owned_communities.status_code == 200
+            assert no_owned_communities.json()["items"] == []
+            assert no_owned_communities.json()["total"] == 0
             assert second_data["access_type"] == "invite_only"
+            assert "id" not in first_data
+            assert "id" not in second_data
+            assert "id" not in concurrent_data
             assert "owner_id" not in first_data
             assert sorted(response.status_code for response in concurrent_joins) == [200, 201], [
                 response.text for response in concurrent_joins
@@ -198,7 +214,9 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
             created_join = next(
                 response for response in concurrent_joins if response.status_code == 201
             )
-            assert created_join.json()["community_id"] == first_data["id"]
+            assert created_join.json()["community_slug"] == first_slug
+            assert "community_id" not in created_join.json()
+            assert "id" not in created_join.json()
             assert created_join.json()["role"] == "member"
             assert "user_id" not in created_join.json()
             assert private_join.status_code == 404
@@ -232,9 +250,18 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
             assert owner_edit.json()["slug"] == first_data["slug"]
 
             async with session_factory() as session:
+                created_communities = await session.scalars(
+                    select(Community).where(Community.public_id.in_(created_public_ids))
+                )
+                created_community_rows = list(created_communities.all())
+                assert len(created_community_rows) == 3
+                assert all(row.public_id != row.id for row in created_community_rows)
+                assert all(row.slug.endswith(row.public_id.hex) for row in created_community_rows)
                 memberships = await session.scalars(
                     select(CommunityMembership).where(
-                        CommunityMembership.community_id.in_(created_ids)
+                        CommunityMembership.community_id.in_(
+                            [row.id for row in created_community_rows]
+                        )
                     )
                 )
                 rows = list(memberships.all())
@@ -247,7 +274,7 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
                 async with session_factory() as session:
                     session.add(
                         CommunityMembership(
-                            community_id=created_ids[0],
+                            community_id=created_community_rows[0].id,
                             user_id=owner_id,
                             role="member",
                         )
@@ -269,7 +296,10 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
         finally:
             async with session_factory() as session:
                 await session.execute(
-                    delete(Community).where(Community.id.in_([*created_ids, expired_community_id]))
+                    delete(Community).where(
+                        Community.public_id.in_(created_public_ids)
+                        | (Community.id == expired_community_id)
+                    )
                 )
                 await session.execute(delete(User).where(User.id.in_([owner_id, joiner_id])))
                 await session.commit()

@@ -317,7 +317,8 @@ Must be resolved in the indicated phase; absence of a choice must not block plan
 | Expo Router and state/data libraries | Prefer Expo Router; choose state, query/cache, and forms libraries based on supported versions and team comfort | 0 |
 | Auth method | **Approved:** email/password with verified email and account recovery; no social sign-in initially. Email delivery remains behind a replaceable adapter. | 2 |
 | Community invites | **Approved:** owner-created, single-use, revocable token; maximum 7-day lifetime; verified signed-in acceptance; raw token shown once and hash-only persistence. | 3 |
-| Community name uniqueness | **Approved:** global, case-insensitive uniqueness after trimming; existing duplicates keep IDs/slugs and receive deterministic numeric name suffixes during migration. | 3 |
+| Community name uniqueness | **Approved:** global, case-insensitive uniqueness after trimming; migration suffixes legacy duplicates while preserving internal IDs. | 3 |
+| Public resource identifiers | **Approved:** API responses and public slugs must not expose database primary keys; use independent public UUIDs and immutable public slugs after migration. | 3 |
 | Cloud provider, region, deployment target, budget | Compare managed container hosting, managed PostgreSQL, storage, backups, data residency, and egress cost after prototype signoff | 10 |
 | ORM and DB access | Validate SQLAlchemy async/sync approach, pooling, transaction boundaries, and migration tooling | 0 |
 | Email, push, object storage | Pick providers and define adapters, deliverability, costs, residency, and failure policy | 0/4/5 |
@@ -448,12 +449,19 @@ changed.
 After the owner reported duplicate community names, creation now rejects
 case/whitespace-equivalent names with `409 Conflict`. Alembic revision
 `0007_unique_community_names` deterministically renames legacy duplicates
-(keeping IDs and slugs) before adding a PostgreSQL unique index. A seeded
+(keeping internal IDs) before adding a PostgreSQL unique index. A seeded
 pre-migration PostgreSQL test kept the original `California` and existing
 `California (2)` rows intact, renamed conflicting rows with collision-free
 numeric suffixes, preserved every slug, and found no duplicate normalized
 names afterward. Concurrent create tests also confirmed one success and one
-`409`. New slugs now combine a readable normalized-name prefix with the full
-community UUID; existing slug values are left untouched. The full suite passed
-101/101 tests with zero skips; downgrade/re-upgrade, Alembic drift, Ruff, and
+`409`. Migration `0008_public_resource_ids` adds independent public UUIDs for
+users, communities, and invites; new community slugs use the public UUID, not
+the internal database primary key. Existing community slugs are rotated to
+public UUIDs (old local share links will need to be refreshed); API DTOs return
+public identifiers or slugs and omit internal primary keys. A seeded pre-`0008`
+row confirmed slug rotation uses its separate public UUID while preserving the
+internal row ID. `GET /communities/mine` lets owners retrieve refreshed slugs,
+including for private communities. The full suite passed 101/101 tests with
+zero skips against isolated PostgreSQL 18. Migration `0008` was upgraded/
+downgraded/re-upgraded and Alembic found no model drift. Ruff lint and
 formatting checks passed.

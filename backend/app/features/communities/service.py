@@ -83,6 +83,21 @@ async def discover_communities(
     )
 
 
+async def list_owned_communities(
+    session: AsyncSession,
+    *,
+    owner_id: UUID,
+    limit: int,
+    offset: int,
+) -> tuple[list[Community], int]:
+    return await repository.list_owned_communities(
+        session,
+        owner_id=owner_id,
+        limit=limit,
+        offset=offset,
+    )
+
+
 async def discoverable_topics(session: AsyncSession) -> list[str]:
     return await repository.list_public_topics(session)
 
@@ -98,12 +113,14 @@ async def create_community(
         raise CommunityNameConflict
 
     community_id = uuid4()
-    slug = _community_slug(data.name, community_id)
+    public_id = uuid4()
+    slug = _community_slug(data.name, public_id)
 
     try:
         community = await repository.create_community(
             session,
             community_id=community_id,
+            public_id=public_id,
             owner_id=owner_id,
             name=data.name,
             slug=slug,
@@ -130,7 +147,7 @@ async def join_community(
     *,
     slug: str,
     user_id: UUID,
-) -> tuple[CommunityMembership, bool]:
+) -> tuple[CommunityMembership, bool, str]:
     now = datetime.now(UTC)
     community = await repository.get_joinable_community(session, slug=slug, now=now)
     if community is None:
@@ -144,7 +161,7 @@ async def join_community(
     )
     if membership is not None:
         await session.commit()
-        return membership, False
+        return membership, False, community.slug
 
     membership = await repository.add_member(
         session,
@@ -152,7 +169,7 @@ async def join_community(
         user_id=user_id,
     )
     await session.commit()
-    return membership, True
+    return membership, True, community.slug
 
 
 async def leave_community(
@@ -299,7 +316,7 @@ async def list_community_invites(
             invite_status = "active"
         result.append(
             CommunityInviteRead(
-                invite_id=invite.id,
+                invite_public_id=invite.public_id,
                 created_at=invite.created_at,
                 expires_at=invite.expires_at,
                 status=invite_status,
@@ -312,7 +329,7 @@ async def revoke_community_invite(
     session: AsyncSession,
     *,
     slug: str,
-    invite_id: UUID,
+    invite_public_id: UUID,
     owner_id: UUID,
 ) -> None:
     community = await _get_locked_owned_community(
@@ -323,7 +340,7 @@ async def revoke_community_invite(
     invite = await repository.get_community_invite(
         session,
         community_id=community.id,
-        invite_id=invite_id,
+        invite_public_id=invite_public_id,
         for_update=True,
     )
     if invite is None:
@@ -345,7 +362,7 @@ async def accept_community_invite(
     *,
     invite_token: str,
     user_id: UUID,
-) -> tuple[CommunityMembership, bool]:
+) -> tuple[CommunityMembership, bool, str]:
     token_hash = hash_one_time_token(invite_token)
     community_id = await repository.get_invite_community_id_by_token_hash(
         session,
@@ -389,7 +406,7 @@ async def accept_community_invite(
             await session.rollback()
             raise CommunityInviteAlreadyUsed
         await session.commit()
-        return existing_membership, False
+        return existing_membership, False, community.slug
 
     membership = await repository.get_membership(
         session,
@@ -406,7 +423,7 @@ async def accept_community_invite(
     invite.consumed_at = now
     invite.accepted_by_user_id = user_id
     await session.commit()
-    return membership, created
+    return membership, created, community.slug
 
 
 async def _get_locked_owned_community(
@@ -435,8 +452,8 @@ def _slugify(value: str) -> str:
     return slug[:107].rstrip("-") or "community"
 
 
-def _community_slug(value: str, community_id: UUID) -> str:
-    return f"{_slugify(value)}-{community_id.hex}"
+def _community_slug(value: str, public_id: UUID) -> str:
+    return f"{_slugify(value)}-{public_id.hex}"
 
 
 def _is_slug_unique_conflict(error: Exception) -> bool:

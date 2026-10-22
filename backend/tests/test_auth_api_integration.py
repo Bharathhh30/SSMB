@@ -86,7 +86,7 @@ def test_email_auth_verification_sessions_refresh_and_recovery() -> None:
     new_password = "replacement secure passphrase 2026!"
     mailer = FakeAuthEmailSender()
 
-    async def run(client: AsyncClient) -> None:
+    async def run(client: AsyncClient, app: FastAPI) -> None:
         register_payload = {
             "email": email,
             "password": original_password,
@@ -167,9 +167,18 @@ def test_email_auth_verification_sessions_refresh_and_recovery() -> None:
             headers={"Authorization": f"Bearer {first_session['access_token']}"},
         )
         assert profile.status_code == 200
+        assert profile.json()["public_id"]
+        assert "id" not in profile.json()
         assert profile.json()["email"] == email
         assert profile.json()["display_name"] == "Test account"
         assert "password_hash" not in profile.json()
+        session_factory = app.state.database_session_factory
+        assert session_factory is not None
+        async with session_factory() as database_session:
+            account = await database_session.scalar(select(User).where(User.email == email))
+            assert account is not None
+            assert account.public_id != account.id
+            assert profile.json()["public_id"] == str(account.public_id)
 
         refreshed = await client.post(
             "/api/v1/auth/refresh",
@@ -265,8 +274,8 @@ def test_email_auth_verification_sessions_refresh_and_recovery() -> None:
         assert signed_out_profile.status_code == 401
 
     async def run_with_client() -> None:
-        async with api_client(mailer, email) as (client, _app):
-            await run(client)
+        async with api_client(mailer, email) as (client, app):
+            await run(client, app)
 
     asyncio.run(run_with_client())
 
@@ -481,6 +490,8 @@ def test_private_profile_update_validates_and_persists_display_name_and_interest
 
             initial = await client.get("/api/v1/profile/me", headers=auth_headers)
             assert initial.status_code == 200
+            assert initial.json()["public_id"]
+            assert "id" not in initial.json()
             assert initial.json()["display_name"] == "Profile User"
             assert initial.json()["interests"] == []
             assert "email" not in initial.json()

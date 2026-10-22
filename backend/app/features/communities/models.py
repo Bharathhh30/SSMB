@@ -29,6 +29,7 @@ class Community(Base):
         CheckConstraint("length(trim(name)) > 0", name="ck_communities_name_not_blank"),
         CheckConstraint("length(trim(slug)) > 0", name="ck_communities_slug_not_blank"),
         CheckConstraint("length(trim(topic)) > 0", name="ck_communities_topic_not_blank"),
+        UniqueConstraint("public_id", name="uq_communities_public_id"),
         UniqueConstraint("slug", name="uq_communities_slug"),
         Index("ix_communities_owner_id", "owner_id"),
         Index("ix_communities_topic", "topic"),
@@ -40,6 +41,12 @@ class Community(Base):
     )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    public_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        nullable=False,
+        default=uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
     owner_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),
@@ -118,12 +125,19 @@ class CommunityInvite(Base):
             "NOT (consumed_at IS NOT NULL AND revoked_at IS NOT NULL)",
             name="ck_community_invites_not_consumed_and_revoked",
         ),
+        UniqueConstraint("public_id", name="uq_community_invites_public_id"),
         UniqueConstraint("token_hash", name="uq_community_invites_token_hash"),
         Index("ix_community_invites_community_id", "community_id"),
         Index("ix_community_invites_expires_at", "expires_at"),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    public_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        nullable=False,
+        default=uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
     community_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("communities.id", ondelete="CASCADE"),

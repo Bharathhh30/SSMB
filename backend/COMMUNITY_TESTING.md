@@ -19,9 +19,11 @@ The same endpoints can be called from a terminal with `curl.exe`.
 
 Expected: `201 Created`, with a generated URL-safe `slug`. Save that slug for
 the membership examples. The first creator is persisted as the `owner`.
-New slugs use a normalized readable name followed by the full community UUID
-in hexadecimal (for example, `gate-study-circle-<32-hex-id>`). That suffix
-makes the slug distinct even when different names normalize to the same text.
+New slugs use a normalized readable name followed by a **public** UUID in
+hexadecimal (for example, `gate-study-circle-<32-hex-public-id>`). That UUID is
+separate from the internal database primary key. Responses use `public_id` or
+the slug; they never return the internal primary key. The UI should display
+`name`, not the slug; clients must pass the complete slug for routes.
 The public preview endpoint returns `member_count`, including the owner and any
 moderators or members.
 Community display names are globally unique after trimming and ignoring case.
@@ -30,8 +32,10 @@ instead of creating another confusing copy.
 
 When you apply the new database migration, existing duplicate names are repaired
 deterministically: the oldest keeps its current name, later duplicates receive
-numeric suffixes, and existing unique names are preserved. Community IDs and
-slugs are unchanged.
+numeric suffixes, and existing unique names are preserved. The following
+public-ID migration replaces existing slugs with the new public-UUID format;
+refresh any old local test links after applying it. Internal database IDs and
+primary keys are not part of community, membership, or invite responses.
 
 ## Create an invite-only community
 
@@ -67,6 +71,9 @@ verified account. Neither request has a JSON body.
 
 ## Read and update your community
 
+- `GET /api/v1/communities/mine` lists all communities you own, including
+  invite-only and expired ones. Use it to retrieve refreshed slugs after
+  applying migration `0008`.
 - `GET /api/v1/communities/{slug}/manage` returns a community only to its owner,
   including an invite-only community that is hidden from public preview.
 - `PATCH /api/v1/communities/{slug}` updates only fields supplied in the body.
@@ -94,7 +101,7 @@ As the community owner, create an invite-only community, then call:
 
 `POST /api/v1/communities/{slug}/invites`
 
-No request body is required. The response contains `invite_id`,
+No request body is required. The response contains `invite_public_id`,
 `invite_token`, and `expires_at`. The token is returned only once and is stored
 as a hash in PostgreSQL. It expires after 7 days at most, or sooner if the
 community expires first.
@@ -116,14 +123,15 @@ token receives `409`. Invalid, expired, or revoked invites receive `404`.
 Owners can inspect invite metadata without exposing tokens:
 
 - `GET /api/v1/communities/{slug}/invites`
-- `DELETE /api/v1/communities/{slug}/invites/{invite_id}`
+- `DELETE /api/v1/communities/{slug}/invites/{invite_public_id}`
 
 Revocation returns `204` and is safe to repeat. An already accepted invite
 cannot be revoked (`409`). Invite creation is limited to 10 attempts per owner
 and acceptance to 20 attempts per account in the configured rate-limit window
 (15 minutes by default); throttled responses include `Retry-After`.
 
-The backend returns the secret token, not a hardcoded host or app URL. The
-mobile client will wrap it in the shareable deep link when invite-link UI is
-integrated. For this backend smoke test, paste the token into the acceptance
-request above.
+The owner invite list and revoke endpoint use the non-secret
+`invite_public_id`, not the invite table's internal primary key. The backend
+returns the secret token, not a hardcoded host or app URL; the mobile client
+will wrap it in the shareable deep link when invite-link UI is integrated.
+For this backend smoke test, paste the token into the acceptance request above.

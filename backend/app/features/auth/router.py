@@ -242,7 +242,7 @@ async def get_me(principal: AuthenticatedDependency) -> AuthenticatedUserRead:
             headers={"WWW-Authenticate": "Bearer"},
         )
     return AuthenticatedUserRead(
-        id=user.id,
+        public_id=user.public_id,
         email=user.email,
         display_name=user.display_name,
         email_verified_at=user.email_verified_at,

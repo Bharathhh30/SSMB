@@ -7,7 +7,7 @@ MAX_INTEREST_LENGTH = 80
 
 
 class ProfileRead(BaseModel):
-    id: UUID
+    public_id: UUID
     display_name: str
     interests: list[str]
 

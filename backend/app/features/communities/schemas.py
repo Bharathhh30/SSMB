@@ -8,9 +8,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 class CommunityRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: UUID
+    public_id: UUID
     slug: str = Field(
-        description="Stable URL-safe identifier; new slugs include the full community UUID suffix."
+        description=(
+            "Stable URL-safe identifier; new slugs include the full public UUID, "
+            "not the database primary key."
+        )
     )
     name: str
     topic: str
@@ -32,9 +35,7 @@ class CommunityTopicList(BaseModel):
 
 
 class CommunityMembershipRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    community_id: UUID
+    community_slug: str
     role: Literal["owner", "moderator", "member"]
     joined_at: datetime
 
@@ -47,7 +48,7 @@ class CommunityDetailRead(CommunityRead):
 
 
 class CommunityInviteCreated(BaseModel):
-    invite_id: UUID
+    invite_public_id: UUID
     invite_token: str = Field(
         min_length=40,
         max_length=128,
@@ -67,7 +68,7 @@ class CommunityInviteAccept(BaseModel):
 
 
 class CommunityInviteRead(BaseModel):
-    invite_id: UUID
+    invite_public_id: UUID
     created_at: datetime
     expires_at: datetime
     status: Literal["active", "accepted", "revoked", "expired"]

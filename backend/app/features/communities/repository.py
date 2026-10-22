@@ -48,6 +48,26 @@ async def list_communities(
     return list(communities.all()), total or 0
 
 
+async def list_owned_communities(
+    session: AsyncSession,
+    *,
+    owner_id: UUID,
+    limit: int,
+    offset: int,
+) -> tuple[list[Community], int]:
+    filters = [Community.owner_id == owner_id]
+    total = await session.scalar(select(func.count()).select_from(Community).where(*filters))
+    statement = (
+        select(Community)
+        .where(*filters)
+        .order_by(Community.created_at.desc(), Community.id.asc())
+        .limit(limit)
+        .offset(offset)
+    )
+    communities = await session.scalars(statement)
+    return list(communities.all()), total or 0
+
+
 async def list_public_topics(session: AsyncSession) -> list[str]:
     now = datetime.now(UTC)
     topic = func.trim(Community.topic).label("topic")
@@ -107,6 +127,7 @@ async def create_community(
     session: AsyncSession,
     *,
     community_id: UUID,
+    public_id: UUID,
     owner_id: UUID,
     name: str,
     slug: str,
@@ -117,6 +138,7 @@ async def create_community(
 ) -> Community:
     community = Community(
         id=community_id,
+        public_id=public_id,
         owner_id=owner_id,
         name=name,
         slug=slug,
@@ -224,6 +246,7 @@ async def create_invite(
 ) -> CommunityInvite:
     invite = CommunityInvite(
         id=uuid4(),
+        public_id=uuid4(),
         community_id=community_id,
         created_by_user_id=created_by_user_id,
         token_hash=token_hash,
@@ -294,11 +317,11 @@ async def get_community_invite(
     session: AsyncSession,
     *,
     community_id: UUID,
-    invite_id: UUID,
+    invite_public_id: UUID,
     for_update: bool = False,
 ) -> CommunityInvite | None:
     statement = select(CommunityInvite).where(
-        CommunityInvite.id == invite_id,
+        CommunityInvite.public_id == invite_public_id,
         CommunityInvite.community_id == community_id,
     )
     if for_update:

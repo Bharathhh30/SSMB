@@ -24,7 +24,7 @@ async def get_own_profile(
         .order_by(UserInterest.position.asc())
     )
     return ProfileRead(
-        id=user.id,
+        public_id=user.public_id,
         display_name=user.display_name or "",
         interests=[row.interest for row in interest_rows.all()],
     )

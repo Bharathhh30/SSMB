@@ -85,7 +85,7 @@ async def join_community(
     ],
 ) -> CommunityMembershipRead:
     try:
-        membership, created = await service.join_community(
+        membership, created, community_slug = await service.join_community(
             session,
             slug=slug,
             user_id=principal.user.id,
@@ -96,7 +96,11 @@ async def join_community(
             detail="Community not found",
         ) from None
     response.status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
-    return CommunityMembershipRead.model_validate(membership)
+    return CommunityMembershipRead(
+        community_slug=community_slug,
+        role=membership.role,
+        joined_at=membership.joined_at,
+    )
 
 
 @router.delete(
@@ -175,7 +179,7 @@ async def create_community_invite(
     except CommunityInviteConflict as error:
         raise HTTPException(status_code=409, detail=str(error)) from None
     return CommunityInviteCreated(
-        invite_id=invite.id,
+        invite_public_id=invite.public_id,
         invite_token=raw_token,
         expires_at=invite.expires_at,
     )
@@ -219,7 +223,7 @@ async def get_community_invites(
 
 
 @router.delete(
-    "/{slug}/invites/{invite_id}",
+    "/{slug}/invites/{invite_public_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Revoke an unused community invite",
     responses={
@@ -235,13 +239,13 @@ async def revoke_community_invite(
         str,
         Path(min_length=1, max_length=140, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$"),
     ],
-    invite_id: UUID,
+    invite_public_id: UUID,
 ) -> Response:
     try:
         await service.revoke_community_invite(
             session,
             slug=slug,
-            invite_id=invite_id,
+            invite_public_id=invite_public_id,
             owner_id=principal.user.id,
         )
     except CommunityNotFound:
@@ -287,7 +291,7 @@ async def accept_community_invite(
         maximum_attempts=service.COMMUNITY_INVITE_ACCEPT_LIMIT,
     )
     try:
-        membership, created = await service.accept_community_invite(
+        membership, created, community_slug = await service.accept_community_invite(
             session,
             invite_token=data.invite_token,
             user_id=principal.user.id,
@@ -303,7 +307,11 @@ async def accept_community_invite(
             detail="This invite has already been used by another account.",
         ) from None
     response.status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
-    return CommunityMembershipRead.model_validate(membership)
+    return CommunityMembershipRead(
+        community_slug=community_slug,
+        role=membership.role,
+        joined_at=membership.joined_at,
+    )
 
 
 @router.get(
@@ -406,6 +414,26 @@ async def get_communities(
         session,
         query=q,
         topic=topic,
+        limit=limit,
+        offset=offset,
+    )
+    return CommunityPage(items=communities, total=total, limit=limit, offset=offset)
+
+
+@router.get(
+    "/mine",
+    response_model=CommunityPage,
+    summary="List communities owned by the authenticated user",
+)
+async def get_my_communities(
+    principal: AuthenticatedDependency,
+    session: DatabaseSession,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> CommunityPage:
+    communities, total = await service.list_owned_communities(
+        session,
+        owner_id=principal.user.id,
         limit=limit,
         offset=offset,
     )

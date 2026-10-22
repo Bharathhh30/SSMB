@@ -91,6 +91,7 @@ def patch(app: FastAPI, path: str, payload: dict[str, object]) -> Response:
 def test_discover_communities_returns_a_bounded_page() -> None:
     community = Community(
         id=uuid4(),
+        public_id=uuid4(),
         owner_id=uuid4(),
         name="GATE Quant Lab",
         slug="gate-quant-lab",
@@ -115,7 +116,7 @@ def test_discover_communities_returns_a_bounded_page() -> None:
     assert response.json() == {
         "items": [
             {
-                "id": str(community.id),
+                "public_id": str(community.public_id),
                 "slug": "gate-quant-lab",
                 "name": "GATE Quant Lab",
                 "topic": "Exam prep",
@@ -129,6 +130,8 @@ def test_discover_communities_returns_a_bounded_page() -> None:
         "limit": 1,
         "offset": 2,
     }
+    assert "id" not in response.json()["items"][0]
+    assert "owner_id" not in response.json()["items"][0]
     session.scalar.assert_awaited_once()
     session.scalars.assert_awaited_once()
 
@@ -209,6 +212,7 @@ def test_discover_accepts_inclusive_query_bounds() -> None:
 def test_public_community_detail_returns_a_safe_preview() -> None:
     community = Community(
         id=uuid4(),
+        public_id=uuid4(),
         owner_id=uuid4(),
         name="GATE Quant Lab",
         slug="gate-quant-lab",
@@ -227,8 +231,10 @@ def test_public_community_detail_returns_a_safe_preview() -> None:
 
     assert response.status_code == 200
     assert response.json()["slug"] == "gate-quant-lab"
+    assert response.json()["public_id"] == str(community.public_id)
     assert response.json()["access_type"] == "open"
     assert response.json()["member_count"] == 7
+    assert "id" not in response.json()
     assert "owner_id" not in response.json()
     session.execute.assert_awaited_once()
 
@@ -315,14 +321,15 @@ def test_owner_management_requires_authentication() -> None:
     app = make_test_app(session)
 
     read = get(app, "/api/v1/communities/study-circle/manage")
+    mine = get(app, "/api/v1/communities/mine")
     update = patch(
         app,
         "/api/v1/communities/study-circle",
         {"name": "Updated study circle"},
     )
 
-    assert read.status_code == update.status_code == 401
-    assert read.json() == update.json() == {"detail": "Authentication required"}
+    assert read.status_code == mine.status_code == update.status_code == 401
+    assert read.json() == mine.json() == update.json() == {"detail": "Authentication required"}
     session.scalar.assert_not_awaited()
 
 
@@ -391,6 +398,7 @@ def test_community_creation_returns_only_public_fields(monkeypatch: pytest.Monke
     owner_id = uuid4()
     community = Community(
         id=uuid4(),
+        public_id=uuid4(),
         owner_id=owner_id,
         name="Study Circle",
         slug="study-circle",
@@ -420,7 +428,7 @@ def test_community_creation_returns_only_public_fields(monkeypatch: pytest.Monke
 
     assert response.status_code == 201
     assert response.json() == {
-        "id": str(community.id),
+        "public_id": str(community.public_id),
         "slug": "study-circle",
         "name": "Study Circle",
         "topic": "Biology",
@@ -429,6 +437,7 @@ def test_community_creation_returns_only_public_fields(monkeypatch: pytest.Monke
         "expires_at": None,
         "created_at": community.created_at.isoformat().replace("+00:00", "Z"),
     }
+    assert "id" not in response.json()
     assert "owner_id" not in response.json()
     create.assert_awaited_once()
     assert create.await_args.kwargs["owner_id"] == owner_id
@@ -518,6 +527,7 @@ def test_owner_can_read_and_update_community_without_changing_its_slug(
     owner_id = uuid4()
     community = Community(
         id=uuid4(),
+        public_id=uuid4(),
         owner_id=owner_id,
         name="Study Circle",
         slug="study-circle",
@@ -550,6 +560,8 @@ def test_owner_can_read_and_update_community_without_changing_its_slug(
 
     assert managed.status_code == 200
     assert managed.json()["slug"] == "study-circle"
+    assert managed.json()["public_id"] == str(community.public_id)
+    assert "id" not in managed.json()
     assert "owner_id" not in managed.json()
     assert updated.status_code == 200
     assert update_owned.await_args.kwargs["owner_id"] == owner_id

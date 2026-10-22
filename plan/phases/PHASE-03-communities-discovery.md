@@ -55,7 +55,11 @@ frontend implementation before backend completion.
   reject duplicates with `409` and repair historical duplicates in migration
   `0007_unique_community_names` without changing IDs or slugs.
 - [x] Make each newly created slug a readable normalized-name prefix plus the
-  full community UUID, while preserving existing slugs for compatibility.
+  full public UUID, separate from the database primary key.
+- [x] Return public identifiers instead of internal user/community/invite
+  primary keys; rotate pre-existing community slugs during migration
+  `0008_public_resource_ids`. The UI displays the community name and passes
+  the full slug in API routes.
 - [x] Implement idempotent joins for active open communities and member leave;
   serialize concurrent joins using a community row lock and enforce the
   membership uniqueness constraint in PostgreSQL.
@@ -63,6 +67,8 @@ frontend implementation before backend completion.
   attempts; prevent the owner from leaving before ownership transfer exists.
 - [x] Add owner-only management read and metadata update; preserve community
   slugs when names change and allow owners to clear an optional expiry.
+- [x] Add a paginated owner-community list so owners can recover current slugs
+  for private/expired communities without exposing internal primary keys.
 - [x] Include the current owner/moderator/member total in the public community
   detail response without exposing member identities.
 - [x] Distinguish authenticated management denial (`403`) from a missing

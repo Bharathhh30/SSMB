@@ -21,6 +21,11 @@ def test_initial_models_register_user_and_community_tables() -> None:
 
     communities = Base.metadata.tables["communities"]
     assert communities.c.owner_id.foreign_keys
+    assert communities.c.public_id.nullable is False
+    assert any(
+        isinstance(constraint, UniqueConstraint) and constraint.name == "uq_communities_public_id"
+        for constraint in communities.constraints
+    )
     assert any(
         isinstance(constraint, UniqueConstraint) and constraint.name == "uq_communities_slug"
         for constraint in communities.constraints
@@ -42,6 +47,12 @@ def test_initial_models_register_user_and_community_tables() -> None:
         for constraint in memberships.constraints
     )
     invites = Base.metadata.tables["community_invites"]
+    assert invites.c.public_id.nullable is False
+    assert any(
+        isinstance(constraint, UniqueConstraint)
+        and constraint.name == "uq_community_invites_public_id"
+        for constraint in invites.constraints
+    )
     assert any(
         isinstance(constraint, UniqueConstraint)
         and constraint.name == "uq_community_invites_token_hash"
@@ -53,19 +64,24 @@ def test_initial_models_register_user_and_community_tables() -> None:
         for constraint in invites.constraints
     )
     users = Base.metadata.tables["users"]
+    assert users.c.public_id.nullable is False
     assert users.c.email.nullable is True
     assert users.c.password_hash.nullable is True
     assert users.c.email_verified_at.nullable is True
+    assert any(
+        isinstance(constraint, UniqueConstraint) and constraint.name == "uq_users_public_id"
+        for constraint in users.constraints
+    )
     assert any(
         isinstance(constraint, UniqueConstraint) and constraint.name == "uq_users_email"
         for constraint in users.constraints
     )
 
 
-def test_unique_community_name_migration_is_the_single_head() -> None:
+def test_public_resource_identifier_migration_is_the_single_head() -> None:
     script = ScriptDirectory.from_config(Config("alembic.ini"))
 
-    assert script.get_heads() == ["0007_unique_community_names"]
+    assert script.get_heads() == ["0008_public_resource_ids"]
     assert (
         script.get_revision("0004_private_user_interests").down_revision == "0003_auth_rate_limits"
     )
@@ -78,4 +94,8 @@ def test_unique_community_name_migration_is_the_single_head() -> None:
     )
     assert (
         script.get_revision("0007_unique_community_names").down_revision == "0006_community_invites"
+    )
+    assert (
+        script.get_revision("0008_public_resource_ids").down_revision
+        == "0007_unique_community_names"
     )

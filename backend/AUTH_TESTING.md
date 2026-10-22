@@ -66,6 +66,8 @@ and token values. Verification/reset tokens are in the matching Mailpit email.
 
 Use the returned `access_token` as `Authorization: Bearer <token>` for
 `GET /api/v1/auth/me` and `POST /api/v1/auth/logout`.
+The account response exposes a separate `public_id`; it does not return the
+internal database primary key.
 
 **Read private self-profile**
 

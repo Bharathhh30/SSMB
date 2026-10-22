@@ -45,7 +45,7 @@ def test_owner_invites_are_single_use_revocable_expiring_and_rate_limited() -> N
             race_user_b,
             brute_user_id,
         ]
-        community_ids: list[UUID] = []
+        community_public_ids: list[UUID] = []
         rate_limit_secret = uuid4().hex
         rate_limit_hashes = {
             hmac.new(
@@ -104,7 +104,9 @@ def test_owner_invites_are_single_use_revocable_expiring_and_rate_limited() -> N
                     )
                     assert private.status_code == 201
                     private_data = private.json()
-                    community_ids.append(UUID(private_data["id"]))
+                    assert "id" not in private_data
+                    community_public_id = UUID(private_data["public_id"])
+                    community_public_ids.append(community_public_id)
                     slug = private_data["slug"]
 
                     open_community = await client.post(
@@ -117,7 +119,9 @@ def test_owner_invites_are_single_use_revocable_expiring_and_rate_limited() -> N
                         },
                     )
                     assert open_community.status_code == 201
-                    community_ids.append(UUID(open_community.json()["id"]))
+                    open_community_data = open_community.json()
+                    assert "id" not in open_community_data
+                    community_public_ids.append(UUID(open_community_data["public_id"]))
 
                     first_invite_response = await client.post(
                         f"/api/v1/communities/{slug}/invites",
@@ -125,7 +129,9 @@ def test_owner_invites_are_single_use_revocable_expiring_and_rate_limited() -> N
                     )
                     assert first_invite_response.status_code == 201
                     first_invite = first_invite_response.json()
-                    first_invite_id = UUID(first_invite["invite_id"])
+                    first_invite_public_id = UUID(first_invite["invite_public_id"])
+                    assert "id" not in first_invite
+                    assert "invite_id" not in first_invite
                     raw_token = first_invite["invite_token"]
                     expires_at = datetime.fromisoformat(
                         first_invite["expires_at"].replace("Z", "+00:00")
@@ -134,10 +140,15 @@ def test_owner_invites_are_single_use_revocable_expiring_and_rate_limited() -> N
                     assert expires_at <= datetime.now(UTC) + timedelta(days=7)
 
                     async with session_factory() as session:
-                        stored_invite = await session.get(CommunityInvite, first_invite_id)
+                        stored_invite = await session.scalar(
+                            select(CommunityInvite).where(
+                                CommunityInvite.public_id == first_invite_public_id
+                            )
+                        )
                         assert stored_invite is not None
                         assert stored_invite.token_hash == hash_one_time_token(raw_token)
                         assert stored_invite.token_hash != raw_token
+                        assert stored_invite.id != first_invite_public_id
 
                     initial_invite_list = await client.get(
                         f"/api/v1/communities/{slug}/invites",
@@ -177,7 +188,7 @@ def test_owner_invites_are_single_use_revocable_expiring_and_rate_limited() -> N
                         json={"invite_token": raw_token},
                     )
                     revoke_accepted = await client.delete(
-                        f"/api/v1/communities/{slug}/invites/{first_invite_id}",
+                        f"/api/v1/communities/{slug}/invites/{first_invite_public_id}",
                         headers=headers(owner_id),
                     )
 
@@ -185,13 +196,15 @@ def test_owner_invites_are_single_use_revocable_expiring_and_rate_limited() -> N
                         f"/api/v1/communities/{slug}/invites",
                         headers=headers(owner_id),
                     )
-                    revoke_invite_id = UUID(revoke_invite_response.json()["invite_id"])
+                    revoke_invite_public_id = UUID(
+                        revoke_invite_response.json()["invite_public_id"]
+                    )
                     revoke_active = await client.delete(
-                        f"/api/v1/communities/{slug}/invites/{revoke_invite_id}",
+                        f"/api/v1/communities/{slug}/invites/{revoke_invite_public_id}",
                         headers=headers(owner_id),
                     )
                     repeat_revoke = await client.delete(
-                        f"/api/v1/communities/{slug}/invites/{revoke_invite_id}",
+                        f"/api/v1/communities/{slug}/invites/{revoke_invite_public_id}",
                         headers=headers(owner_id),
                     )
                     accept_revoked = await client.post(
@@ -204,13 +217,15 @@ def test_owner_invites_are_single_use_revocable_expiring_and_rate_limited() -> N
                         f"/api/v1/communities/{slug}/invites",
                         headers=headers(owner_id),
                     )
-                    expire_invite_id = UUID(expire_invite_response.json()["invite_id"])
+                    expire_invite_public_id = UUID(
+                        expire_invite_response.json()["invite_public_id"]
+                    )
                     async with session_factory() as session:
                         expired_created_at = datetime.now(UTC) - timedelta(days=2)
                         expired_at = datetime.now(UTC) - timedelta(minutes=1)
                         await session.execute(
                             update(CommunityInvite)
-                            .where(CommunityInvite.id == expire_invite_id)
+                            .where(CommunityInvite.public_id == expire_invite_public_id)
                             .values(
                                 created_at=expired_created_at,
                                 expires_at=expired_at,
@@ -235,7 +250,8 @@ def test_owner_invites_are_single_use_revocable_expiring_and_rate_limited() -> N
                         },
                     )
                     short_community = short_community_response.json()
-                    community_ids.append(UUID(short_community["id"]))
+                    short_community_public_id = UUID(short_community["public_id"])
+                    community_public_ids.append(short_community_public_id)
                     short_invite_response = await client.post(
                         f"/api/v1/communities/{short_community['slug']}/invites",
                         headers=headers(owner_id),
@@ -247,7 +263,7 @@ def test_owner_invites_are_single_use_revocable_expiring_and_rate_limited() -> N
                     async with session_factory() as session:
                         await session.execute(
                             update(Community)
-                            .where(Community.id == UUID(short_community["id"]))
+                            .where(Community.public_id == short_community_public_id)
                             .values(expires_at=datetime.now(UTC) - timedelta(minutes=1))
                         )
                         await session.commit()
@@ -314,6 +330,9 @@ def test_owner_invites_are_single_use_revocable_expiring_and_rate_limited() -> N
             }
             assert first_accept.status_code == 201
             assert first_accept.json()["role"] == "member"
+            assert first_accept.json()["community_slug"] == slug
+            assert "community_id" not in first_accept.json()
+            assert "id" not in first_accept.json()
             assert same_user_retry.status_code == 200
             assert replay_by_other_user.status_code == 409
             assert replay_by_other_user.json() == {
@@ -338,9 +357,13 @@ def test_owner_invites_are_single_use_revocable_expiring_and_rate_limited() -> N
             assert {"accepted", "revoked", "expired", "active"} <= statuses
 
             async with session_factory() as session:
+                private_community = await session.scalar(
+                    select(Community).where(Community.public_id == community_public_id)
+                )
+                assert private_community is not None
                 memberships = await session.scalars(
                     select(CommunityMembership).where(
-                        CommunityMembership.community_id == community_ids[0]
+                        CommunityMembership.community_id == private_community.id
                     )
                 )
                 member_ids = {membership.user_id for membership in memberships.all()}
@@ -350,7 +373,9 @@ def test_owner_invites_are_single_use_revocable_expiring_and_rate_limited() -> N
                 assert (race_user_a in member_ids) != (race_user_b in member_ids)
         finally:
             async with session_factory() as session:
-                await session.execute(delete(Community).where(Community.id.in_(community_ids)))
+                await session.execute(
+                    delete(Community).where(Community.public_id.in_(community_public_ids))
+                )
                 await session.execute(delete(User).where(User.id.in_(user_ids)))
                 await session.execute(
                     delete(AuthRateLimitBucket).where(

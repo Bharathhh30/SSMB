@@ -55,7 +55,7 @@ class AuthMessage(BaseModel):
 
 
 class AuthenticatedUserRead(BaseModel):
-    id: UUID
+    public_id: UUID
     email: EmailStr
     display_name: str
     email_verified_at: datetime
