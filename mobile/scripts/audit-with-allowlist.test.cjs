@@ -6,6 +6,11 @@ const { evaluateAuditReport } = require("./audit-with-allowlist.cjs");
 const expiresOn = "2026-11-05";
 const approvedPolicy = {
   expires_on: expiresOn,
+  known_breaking_fix: {
+    name: "expo",
+    version: "44.0.6",
+    is_semver_major: true,
+  },
   exceptions: [
     {
       advisory: "GHSA-vfj7-8cjw-p6xm",
@@ -90,6 +95,34 @@ test("fails an expired exception even after the advisory disappears", () => {
   assert.ok(result.errors.some((error) => error.includes("expired")));
 });
 
+test("permits only the specifically recorded breaking Expo downgrade", () => {
+  const report = {
+    vulnerabilities: {
+      braces: advisory("braces", "GHSA-vfj7-8cjw-p6xm", {
+        fixAvailable: { name: "expo", version: "44.0.6", isSemVerMajor: true },
+      }),
+    },
+  };
+
+  const result = evaluateAuditReport(report, approvedPolicy, "2026-10-22");
+
+  assert.deepEqual(result.errors, []);
+});
+
+test("fails if npm proposes a different forced downgrade", () => {
+  const report = {
+    vulnerabilities: {
+      braces: advisory("braces", "GHSA-vfj7-8cjw-p6xm", {
+        fixAvailable: { name: "expo", version: "45.0.0", isSemVerMajor: true },
+      }),
+    },
+  };
+
+  const result = evaluateAuditReport(report, approvedPolicy, "2026-10-22");
+
+  assert.ok(result.errors.some((error) => error.includes("unapproved remediation")));
+});
+
 test("fails if npm reports a compatible fix for an excepted advisory", () => {
   const report = {
     vulnerabilities: {
@@ -101,7 +134,7 @@ test("fails if npm reports a compatible fix for an excepted advisory", () => {
 
   const result = evaluateAuditReport(report, approvedPolicy, "2026-10-22");
 
-  assert.ok(result.errors.some((error) => error.includes("A fix is now available")));
+  assert.ok(result.errors.some((error) => error.includes("unapproved remediation")));
 });
 
 test("fails closed when a high finding cannot be traced to an advisory", () => {

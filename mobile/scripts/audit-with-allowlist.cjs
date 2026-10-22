@@ -56,6 +56,26 @@ function collectRootAdvisories(packageName, vulnerabilities, ancestry = new Set(
   ];
 }
 
+function hasCompatibleFix(fixAvailable, policy) {
+  if (fixAvailable === false) {
+    return false;
+  }
+
+  const knownBreakingFix = policy.known_breaking_fix;
+  if (
+    fixAvailable &&
+    typeof fixAvailable === "object" &&
+    fixAvailable.isSemVerMajor === true &&
+    knownBreakingFix?.is_semver_major === true &&
+    fixAvailable.name === knownBreakingFix.name &&
+    fixAvailable.version === knownBreakingFix.version
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 function evaluateAuditReport(report, policy, today = new Date().toISOString().slice(0, 10)) {
   const errors = [];
   const accepted = new Map();
@@ -117,11 +137,17 @@ function evaluateAuditReport(report, policy, today = new Date().toISOString().sl
         );
         continue;
       }
-      if (finding.fixAvailable !== false) {
+      if (hasCompatibleFix(finding.fixAvailable, policy)) {
         errors.push(
-          `A fix is now available for ${finding.advisory}; remove the exception and update the dependency.`,
+          `npm proposed an unapproved remediation for ${finding.advisory}; review it and update the exception policy only if appropriate.`,
         );
         continue;
+      }
+      if (finding.fixAvailable && typeof finding.fixAvailable === "object") {
+        console.warn(
+          `Only the documented breaking fix ${finding.fixAvailable.name}@${finding.fixAvailable.version} ` +
+            `is available for ${finding.advisory}; retaining the approved temporary exception.`,
+        );
       }
       accepted.set(finding.advisory, exception);
     }

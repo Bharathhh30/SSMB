@@ -2,6 +2,11 @@
   "approved_by": "Project owner",
   "approved_on": "2026-10-22",
   "expires_on": "2026-11-05",
+  "known_breaking_fix": {
+    "name": "expo",
+    "version": "44.0.6",
+    "is_semver_major": true
+  },
   "exceptions": [
     {
       "advisory": "GHSA-vfj7-8cjw-p6xm",
