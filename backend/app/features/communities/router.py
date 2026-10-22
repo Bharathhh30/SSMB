@@ -15,6 +15,9 @@ from app.features.communities.schemas import (
     CommunityInviteAccept,
     CommunityInviteCreated,
     CommunityInvitePage,
+    CommunityLifecycleRead,
+    CommunityManagerPage,
+    CommunityManagerRead,
     CommunityMemberRoleRead,
     CommunityMemberRoleUpdate,
     CommunityMembershipRead,
@@ -326,7 +329,7 @@ async def accept_community_invite(
 
 @router.get(
     "/{slug}/manage",
-    response_model=CommunityRead,
+    response_model=CommunityManagerRead,
     summary="Read a community owned by the current user",
     responses={
         403: {"description": "The authenticated user is not the community owner."},
@@ -340,7 +343,7 @@ async def get_owned_community(
         str,
         Path(min_length=1, max_length=140, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$"),
     ],
-) -> CommunityRead:
+) -> CommunityManagerRead:
     try:
         community = await service.get_owned_community(
             session,
@@ -354,7 +357,84 @@ async def get_owned_community(
             status_code=403,
             detail="You are not authorized to manage this community.",
         ) from None
-    return CommunityRead.model_validate(community)
+    return CommunityManagerRead.model_validate(community)
+
+
+@router.put(
+    "/{slug}/archive",
+    response_model=CommunityLifecycleRead,
+    summary="Archive a community without deleting it",
+    description=(
+        "Only the owner can archive a community. It is hidden from public discovery, "
+        "new joins and invite acceptance stop, active unused invites are revoked, "
+        "and existing memberships are retained."
+    ),
+    responses={
+        403: {"description": "The authenticated user is not the community owner."},
+        404: {"description": "No community exists with this slug."},
+    },
+)
+async def archive_community(
+    principal: AuthenticatedDependency,
+    session: DatabaseSession,
+    slug: Annotated[
+        str,
+        Path(min_length=1, max_length=140, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$"),
+    ],
+) -> CommunityLifecycleRead:
+    try:
+        return await service.set_community_archived(
+            session,
+            slug=slug,
+            owner_id=principal.user.id,
+            owner_public_id=principal.user.public_id,
+            archived=True,
+        )
+    except CommunityNotFound:
+        raise HTTPException(status_code=404, detail="Community not found") from None
+    except CommunityForbidden:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not authorized to manage this community.",
+        ) from None
+
+
+@router.put(
+    "/{slug}/restore",
+    response_model=CommunityLifecycleRead,
+    summary="Restore an archived community",
+    description=(
+        "Only the owner can restore an archived community. Existing invite links "
+        "remain revoked; the owner must create fresh invites."
+    ),
+    responses={
+        403: {"description": "The authenticated user is not the community owner."},
+        404: {"description": "No community exists with this slug."},
+    },
+)
+async def restore_community(
+    principal: AuthenticatedDependency,
+    session: DatabaseSession,
+    slug: Annotated[
+        str,
+        Path(min_length=1, max_length=140, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$"),
+    ],
+) -> CommunityLifecycleRead:
+    try:
+        return await service.set_community_archived(
+            session,
+            slug=slug,
+            owner_id=principal.user.id,
+            owner_public_id=principal.user.public_id,
+            archived=False,
+        )
+    except CommunityNotFound:
+        raise HTTPException(status_code=404, detail="Community not found") from None
+    except CommunityForbidden:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not authorized to manage this community.",
+        ) from None
 
 
 @router.patch(
@@ -456,7 +536,7 @@ async def get_my_community_memberships(
 
 @router.get(
     "/mine",
-    response_model=CommunityPage,
+    response_model=CommunityManagerPage,
     summary="List communities owned by the authenticated user",
 )
 async def get_my_communities(
@@ -464,14 +544,19 @@ async def get_my_communities(
     session: DatabaseSession,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
-) -> CommunityPage:
+) -> CommunityManagerPage:
     communities, total = await service.list_owned_communities(
         session,
         owner_id=principal.user.id,
         limit=limit,
         offset=offset,
     )
-    return CommunityPage(items=communities, total=total, limit=limit, offset=offset)
+    return CommunityManagerPage(
+        items=[CommunityManagerRead.model_validate(community) for community in communities],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get(

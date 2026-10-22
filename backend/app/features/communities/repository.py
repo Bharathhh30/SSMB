@@ -1,12 +1,13 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.communities.models import (
     Community,
     CommunityInvite,
+    CommunityLifecycleEvent,
     CommunityMembership,
     CommunityOwnershipChange,
     CommunityRoleChange,
@@ -27,6 +28,7 @@ async def list_communities(
     now = datetime.now(UTC)
     filters = [
         Community.access_type == "open",
+        Community.archived_at.is_(None),
         or_(Community.expires_at.is_(None), Community.expires_at > now),
     ]
 
@@ -82,6 +84,7 @@ async def list_public_topics(session: AsyncSession) -> list[str]:
         select(topic)
         .where(
             Community.access_type == "open",
+            Community.archived_at.is_(None),
             or_(Community.expires_at.is_(None), Community.expires_at > now),
         )
         .distinct()
@@ -97,6 +100,7 @@ async def get_public_community(session: AsyncSession, *, slug: str) -> Community
     statement = select(Community).where(
         Community.slug == slug,
         Community.access_type == "open",
+        Community.archived_at.is_(None),
         or_(Community.expires_at.is_(None), Community.expires_at > now),
     )
     return await session.scalar(statement)
@@ -116,6 +120,7 @@ async def get_public_community_with_member_count(
     statement = select(Community, member_count.label("member_count")).where(
         Community.slug == slug,
         Community.access_type == "open",
+        Community.archived_at.is_(None),
         or_(Community.expires_at.is_(None), Community.expires_at > now),
     )
     row = (await session.execute(statement)).one_or_none()
@@ -177,6 +182,7 @@ async def get_joinable_community(
         .where(
             Community.slug == slug,
             Community.access_type == "open",
+            Community.archived_at.is_(None),
             or_(Community.expires_at.is_(None), Community.expires_at > now),
         )
         .with_for_update()
@@ -365,6 +371,49 @@ async def add_community_ownership_change(
     session.add(ownership_change)
     await session.flush()
     return ownership_change
+
+
+async def revoke_active_community_invites(
+    session: AsyncSession,
+    *,
+    community_id: UUID,
+    now: datetime,
+) -> int:
+    result = await session.execute(
+        update(CommunityInvite)
+        .where(
+            CommunityInvite.community_id == community_id,
+            CommunityInvite.consumed_at.is_(None),
+            CommunityInvite.revoked_at.is_(None),
+            CommunityInvite.expires_at > now,
+        )
+        .values(revoked_at=now)
+    )
+    return max(result.rowcount or 0, 0)
+
+
+async def add_community_lifecycle_event(
+    session: AsyncSession,
+    *,
+    community_id: UUID,
+    community_public_id: UUID,
+    actor_user_id: UUID,
+    actor_public_id: UUID,
+    event_type: str,
+    occurred_at: datetime,
+) -> CommunityLifecycleEvent:
+    event = CommunityLifecycleEvent(
+        id=uuid4(),
+        community_id=community_id,
+        community_public_id=community_public_id,
+        actor_user_id=actor_user_id,
+        actor_public_id=actor_public_id,
+        event_type=event_type,
+        occurred_at=occurred_at,
+    )
+    session.add(event)
+    await session.flush()
+    return event
 
 
 async def add_member(

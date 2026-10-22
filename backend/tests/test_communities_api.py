@@ -76,6 +76,14 @@ async def put_json(app: FastAPI, path: str, payload: dict[str, object]) -> Respo
         return await client.put(path, json=payload)
 
 
+async def put_without_body(app: FastAPI, path: str) -> Response:
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        return await client.put(path)
+
+
 def get(app: FastAPI, path: str) -> Response:
     return asyncio.run(request(app, path))
 
@@ -98,6 +106,10 @@ def patch(app: FastAPI, path: str, payload: dict[str, object]) -> Response:
 
 def put(app: FastAPI, path: str, payload: dict[str, object]) -> Response:
     return asyncio.run(put_json(app, path, payload))
+
+
+def put_empty(app: FastAPI, path: str) -> Response:
+    return asyncio.run(put_without_body(app, path))
 
 
 def test_discover_communities_returns_a_bounded_page() -> None:
@@ -345,6 +357,8 @@ def test_owner_management_requires_authentication() -> None:
     mine = get(app, "/api/v1/communities/mine")
     memberships = get(app, "/api/v1/communities/memberships/me")
     roster = get(app, "/api/v1/communities/study-circle/members")
+    archive = put_empty(app, "/api/v1/communities/study-circle/archive")
+    restore = put_empty(app, "/api/v1/communities/study-circle/restore")
     transfer = post(
         app,
         "/api/v1/communities/study-circle/transfer-ownership",
@@ -361,6 +375,8 @@ def test_owner_management_requires_authentication() -> None:
         == mine.status_code
         == memberships.status_code
         == roster.status_code
+        == archive.status_code
+        == restore.status_code
         == transfer.status_code
         == update.status_code
         == 401
@@ -370,6 +386,8 @@ def test_owner_management_requires_authentication() -> None:
         == mine.json()
         == memberships.json()
         == roster.json()
+        == archive.json()
+        == restore.json()
         == transfer.json()
         == update.json()
         == {"detail": "Authentication required"}

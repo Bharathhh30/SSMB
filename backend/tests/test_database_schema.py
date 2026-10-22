@@ -14,6 +14,7 @@ def test_initial_models_register_user_and_community_tables() -> None:
         "auth_sessions",
         "communities",
         "community_invites",
+        "community_lifecycle_events",
         "community_memberships",
         "community_ownership_changes",
         "community_role_changes",
@@ -37,6 +38,8 @@ def test_initial_models_register_user_and_community_tables() -> None:
         for index in communities.indexes
     )
     assert communities.c.expires_at.nullable is True
+    assert communities.c.archived_at.nullable is True
+    assert any(index.name == "ix_communities_archived_at" for index in communities.indexes)
     memberships = Base.metadata.tables["community_memberships"]
     assert any(
         isinstance(constraint, UniqueConstraint)
@@ -100,6 +103,14 @@ def test_initial_models_register_user_and_community_tables() -> None:
     )
     assert owner_membership_index.unique is True
     assert str(owner_membership_index.dialect_options["postgresql"]["where"]) == "role = 'owner'"
+    lifecycle_events = Base.metadata.tables["community_lifecycle_events"]
+    assert lifecycle_events.c.community_public_id.nullable is False
+    assert lifecycle_events.c.actor_public_id.nullable is False
+    assert any(
+        isinstance(constraint, CheckConstraint)
+        and constraint.name == "ck_community_lifecycle_events_event_type"
+        for constraint in lifecycle_events.constraints
+    )
     users = Base.metadata.tables["users"]
     assert users.c.public_id.nullable is False
     assert users.c.email.nullable is True
@@ -115,10 +126,10 @@ def test_initial_models_register_user_and_community_tables() -> None:
     )
 
 
-def test_community_ownership_transfer_migration_is_the_single_head() -> None:
+def test_community_archive_migration_is_the_single_head() -> None:
     script = ScriptDirectory.from_config(Config("alembic.ini"))
 
-    assert script.get_heads() == ["0010_ownership_transfer"]
+    assert script.get_heads() == ["0011_community_archive"]
     assert (
         script.get_revision("0004_private_user_interests").down_revision == "0003_auth_rate_limits"
     )
@@ -142,3 +153,4 @@ def test_community_ownership_transfer_migration_is_the_single_head() -> None:
     assert (
         script.get_revision("0010_ownership_transfer").down_revision == "0009_community_role_audit"
     )
+    assert script.get_revision("0011_community_archive").down_revision == "0010_ownership_transfer"

@@ -1,7 +1,7 @@
 # Community Platform — Cumulative Product and Engineering Roadmap
 
 **Status:** Implementation in progress
-**Last updated:** 2026-10-21
+**Last updated:** 2026-10-22
 **Product source:** `../Community_Platform_Concept.md`
 **Repository guidance:** `../AGENTS.md`
 
@@ -322,6 +322,7 @@ Must be resolved in the indicated phase; absence of a choice must not block plan
 | Community roster privacy | **Approved (October 22, 2026):** only a community owner or moderator can view that community's member identities; public previews expose aggregate counts only; arbitrary users' cross-community membership histories remain private. | 3 |
 | Moderator role management | **Approved (October 22, 2026):** owners alone can promote existing members to moderators or demote moderators to members; the owner role uses a separate transfer operation; changes are transactionally audited and same-role retries are no-ops. | 3 |
 | Ownership transfer | **Implemented contract (October 22, 2026):** current owner can transfer only to an existing member; target becomes the sole owner, former owner becomes a regular member, and the change is atomic and audited. | 3 |
+| Community archive lifecycle | **Approved (October 22, 2026):** reversible soft archive, no hard deletion in this phase; hide from public surfaces, block joins/invites, revoke active unused invites, retain memberships/data, allow owner restore; restored links remain revoked. | 3 |
 | Role audit retention/anonymization | Decide retention period, access, and account/community deletion behavior for audit events and public-ID snapshots before deletion flows or production launch. | 2/10 |
 | Cloud provider, region, deployment target, budget | Compare managed container hosting, managed PostgreSQL, storage, backups, data residency, and egress cost after prototype signoff | 10 |
 | ORM and DB access | Validate SQLAlchemy async/sync approach, pooling, transaction boundaries, and migration tooling | 0 |
@@ -355,10 +356,11 @@ lists distinct topics with active open communities; Home and Discover handle
 topic loading/failure without blocking the all-communities view. The API
 intentionally does not return invite-only communities until a
 public-preview policy is decided. The backend now supports community creation,
-open join/leave, owner-only metadata management, self-membership discovery, and
-a paginated owner/moderator-only roster; the Expo prototype remains frozen
-until the Backend Completion Gate. The development seed command is explicit
-and refuses to run outside `APP_ENV=development`.
+open join/leave, owner-only metadata management, self-membership discovery, a
+paginated owner/moderator-only roster, and reversible owner-managed archive/
+restore; the Expo prototype remains frozen until the Backend Completion Gate.
+The development seed command is explicit and refuses to run outside
+`APP_ENV=development`.
 
 The first GitHub Actions run is complete. Its backend/PostgreSQL job passed the
 Alembic migration, repository integration tests, and Docker image readiness
@@ -487,5 +489,10 @@ becomes a regular member. Alembic `0010_ownership_transfer` adds a partial
 unique owner-membership index and a separate transfer audit table. Migration
 and role/ownership endpoints passed **105/105 tests with zero skips** on
 isolated PostgreSQL 18; upgrade/downgrade/re-upgrade and drift checks passed.
-Archive semantics and audit retention/anonymization remain open; no mobile
-files were changed.
+The reversible archive lifecycle hides archived communities from public
+surfaces, revokes active unused invitations, and retains memberships and data.
+Alembic `0011_community_archive` adds archive state and lifecycle audit events.
+Archive, transfer, role, and existing APIs passed **106/106 tests with zero
+skips** on isolated PostgreSQL 18; migration rollback/re-upgrade and drift
+checks passed. Permanent community deletion, moderator action permissions,
+and audit retention/anonymization remain open; no mobile files were changed.

@@ -30,7 +30,7 @@ voice, and engagement remain included.
 | 0 | Product decisions | Resolve only decisions needed before each affected API; define endpoint and permission contracts | Open; keep unresolved decisions explicit |
 | 1 | Engineering foundation | FastAPI, PostgreSQL, Alembic, local test database, health/readiness, API conventions, stable errors/logging | Foundation exists; endpoint edge coverage and repeatable DB test setup need work |
 | 2 | Identity and profile | Registration/sign-in, verification/recovery, sessions, profile, preferences, account controls | Auth and private self-profile endpoints implemented/tested; privacy, block, deletion/export APIs remain |
-| 3 | Communities and discovery | Create/read/update/archive, join/leave/requests, invites, memberships, roles, ownership, access rules | Discovery, create/manage, join/leave, single-use invites, owner/self-membership lists, owner/moderator roster reads, audited moderator assignment/removal, and audited ownership transfer are PostgreSQL-tested; archive semantics remain |
+| 3 | Communities and discovery | Create/read/update/archive, join/leave/requests, invites, memberships, roles, ownership, access rules | Discovery, create/manage, join/leave, single-use invites, owner/self-membership lists, owner/moderator roster reads, audited role/ownership changes, and reversible archive/restore are PostgreSQL-tested; moderator action permissions remain |
 | 4 | Content and files | Posts, links, saved items, file metadata, upload/download authorization and storage adapter | Not implemented; storage and retention decisions remain open |
 | 5 | Messaging and notifications | Conversations, messages, read cursors, notification inbox/outbox, delivery adapters | Not implemented; realtime and push decisions remain open |
 | 6 | Scheduling and reservations | Events, RSVP, resource availability/reservation, reminder scheduling | Not implemented; reservation semantics remain open |
@@ -102,6 +102,8 @@ reason rather than silently omitting it.
 | `GET /api/v1/communities/{slug}/members` | Community owner or moderator lists the current roster; returns user public IDs, display names, roles, and join times only | Anonymous/member/unrelated owner denial, unknown slug, private/expired owner access, cross-community isolation, pagination, no email/internal ID leakage |
 | `PUT /api/v1/communities/{slug}/members/{user_public_id}/role` | Owner sets an existing member to `moderator` or `member`; actual changes are transactionally audited and retries are idempotent | Anonymous/non-owner, owner-target conflict, unknown/cross-community target, invalid/extra fields, concurrent writes, exactly one event for a concurrent repeated change, audit response/DB allowlist |
 | `POST /api/v1/communities/{slug}/transfer-ownership` | Current owner transfers to an existing community member; target becomes owner and former owner becomes member; mutation is atomic and audited | Anonymous/non-owner, self/non-member/cross-community target, malformed/extra fields, concurrent transfer, exactly one owner membership, post-transfer owner/leave permissions, audit response/DB allowlist |
+| `PUT /api/v1/communities/{slug}/archive` | Owner reversibly archives; hidden from discovery/public preview; blocks new joins/invites; revokes active unused invites while retaining memberships | Anonymous/non-owner, unknown slug, public discovery/topic/preview exclusion, join/invite denial, existing member leave, idempotency, atomic audit/revocation |
+| `PUT /api/v1/communities/{slug}/restore` | Owner clears archive state; expired communities remain expired; prior invite tokens remain revoked | Anonymous/non-owner, unknown slug, idempotency, public rediscovery only when unexpired, no invite reactivation, lifecycle audit |
 | `GET /api/v1/profile/me` | Authenticated caller's public ID, display name, and private interests | Missing/expired/revoked auth, no internal ID/email/hash leakage, empty interests |
 | `PATCH /api/v1/profile/me` | Update caller's display name; add/remove private interests | Blank/null/unknown/oversized/duplicate values, atomic add/remove behavior, clearing interests |
 
@@ -306,3 +308,22 @@ is a client of the API; it never connects directly to PostgreSQL.
 - The full suite passed **105 tests, 0 skipped** on isolated PostgreSQL 18.
   Upgrade, drift check, downgrade to `0009`, re-upgrade, and a second drift
   check passed. Ruff lint and formatting checks passed.
+
+## 12. Community archive lifecycle (October 22, 2026)
+
+- **Approved lifecycle:** archive is reversible and never deletes the
+  community, memberships, or content. It removes the community from public
+  discovery/previews, blocks new joins and invite acceptance, revokes active
+  unused invitations, and preserves current memberships.
+- `PUT /api/v1/communities/{slug}/archive` and
+  `PUT /api/v1/communities/{slug}/restore` are owner-only and idempotent.
+  Owners can still manage archived communities; existing members can leave.
+  Restore clears archive state but does not reactivate revoked invitations.
+  If expiry has passed, restore leaves the community expired and undiscoverable.
+- Alembic `0011_community_archive` adds nullable `archived_at`, its index, and
+  `community_lifecycle_events`. Archive state, invite revocation, and audit
+  events commit atomically. Downgrade removes both archive state and event
+  history. Generated PostgreSQL SQL was reviewed.
+- Full suite: **106 passed, 0 skipped** on isolated PostgreSQL 18. Upgrade,
+  Alembic drift, downgrade to `0010`, re-upgrade, and a second drift check
+  passed. Ruff lint and formatting checks passed.

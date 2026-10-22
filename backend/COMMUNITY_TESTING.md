@@ -71,20 +71,22 @@ verified account. Neither request has a JSON body.
 
 ## Read and update your community
 
-Before testing moderator or ownership changes against your local database,
-apply the community migrations from the `backend` directory:
+Before testing archive, moderator, or ownership changes against your local
+database, apply the community migrations from the `backend` directory:
 
 ```powershell
 uv run --locked alembic upgrade head
 ```
 
 - `GET /api/v1/communities/mine` lists all communities you own, including
-  invite-only and expired ones. Use it to retrieve refreshed slugs after
-  applying migration `0008`.
+  invite-only, expired, and archived ones. The owner-only result includes
+  `archived_at`; use it to retrieve refreshed slugs after applying migration
+  `0008`.
 - `GET /api/v1/communities/memberships/me` lists communities the signed-in
   account currently belongs to, whether as owner, moderator, or member. It
   returns only the caller's memberships; it does not accept another user's ID.
-  Expired communities are included with `community_status: "expired"`.
+  Expired communities are included with `community_status: "expired"` and
+  archived communities with `community_status: "archived"`.
 - `GET /api/v1/communities/{slug}/members` lists the current roster only to
   that community's owner or moderators. It includes user public IDs, display
   names, roles, and join timestamps, but never internal user IDs or email
@@ -142,8 +144,25 @@ uv run --locked alembic upgrade head
   per community. Its downgrade removes that constraint and ownership history;
   it should not be used as a production rollback without accounting for lost
   audit records.
+- `PUT /api/v1/communities/{slug}/archive` archives without deleting the
+  community. Only the owner can call it. It disappears from discovery and
+  public preview, new joins and invite acceptance stop, active unused invites
+  are revoked, and existing memberships remain. The response reports
+  `status: "archived"`, `archived_at`, `changed`, and
+  `revoked_invite_count`. Repeating the request is a no-op.
+- `PUT /api/v1/communities/{slug}/restore` makes it available again if it has
+  not expired. If its expiry has passed, the response status remains
+  `"expired"` and it is still not discoverable. Archived invite tokens stay
+  revoked after restore; the owner must create fresh ones. Archive/restore
+  actions are recorded in `community_lifecycle_events`.
+- Existing members can still leave an archived community; its owner must
+  restore it or transfer ownership before leaving. No permanent community
+  deletion endpoint is included in this phase.
+- Alembic `0011_community_archive` adds archive state and lifecycle history.
+  Downgrading removes both, so it is not a data-preserving production rollback.
 - `GET /api/v1/communities/{slug}/manage` returns a community only to its owner,
-  including an invite-only community that is hidden from public preview.
+  including invite-only, expired, and archived communities that are hidden
+  from public preview.
 - `PATCH /api/v1/communities/{slug}` updates only fields supplied in the body.
   For example:
 

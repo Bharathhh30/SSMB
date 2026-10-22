@@ -9,6 +9,7 @@ from app.features.auth.models import (
 from app.features.communities.models import (
     Community,
     CommunityInvite,
+    CommunityLifecycleEvent,
     CommunityMembership,
     CommunityOwnershipChange,
     CommunityRoleChange,
@@ -23,6 +24,7 @@ __all__ = [
     "AuthSession",
     "Community",
     "CommunityInvite",
+    "CommunityLifecycleEvent",
     "CommunityMembership",
     "CommunityOwnershipChange",
     "CommunityRoleChange",

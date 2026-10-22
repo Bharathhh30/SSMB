@@ -33,6 +33,7 @@ class Community(Base):
         UniqueConstraint("slug", name="uq_communities_slug"),
         Index("ix_communities_owner_id", "owner_id"),
         Index("ix_communities_topic", "topic"),
+        Index("ix_communities_archived_at", "archived_at"),
         Index(
             "uq_communities_normalized_name",
             func.lower(func.btrim(column("name"))),
@@ -63,6 +64,7 @@ class Community(Base):
     )
     access_type: Mapped[str] = mapped_column(String(20), nullable=False)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -201,6 +203,41 @@ class CommunityOwnershipChange(Base):
     )
     new_owner_public_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     transferred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
+class CommunityLifecycleEvent(Base):
+    __tablename__ = "community_lifecycle_events"
+    __table_args__ = (
+        CheckConstraint(
+            "event_type IN ('archived', 'restored')",
+            name="ck_community_lifecycle_events_event_type",
+        ),
+        Index(
+            "ix_community_lifecycle_events_community_occurred_at",
+            "community_public_id",
+            "occurred_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    community_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("communities.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    community_public_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    actor_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    actor_public_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),

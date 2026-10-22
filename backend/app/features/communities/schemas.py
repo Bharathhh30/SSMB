@@ -30,6 +30,17 @@ class CommunityPage(BaseModel):
     offset: int
 
 
+class CommunityManagerRead(CommunityRead):
+    archived_at: datetime | None
+
+
+class CommunityManagerPage(BaseModel):
+    items: list[CommunityManagerRead]
+    total: int
+    limit: int
+    offset: int
+
+
 class CommunityTopicList(BaseModel):
     items: list[str]
 
@@ -44,7 +55,7 @@ class MyCommunityMembershipRead(BaseModel):
     community: CommunityRead
     role: Literal["owner", "moderator", "member"]
     joined_at: datetime
-    community_status: Literal["active", "expired"]
+    community_status: Literal["active", "expired", "archived"]
 
 
 class MyCommunityMembershipPage(BaseModel):
@@ -92,6 +103,14 @@ class CommunityOwnershipTransferRead(BaseModel):
     previous_owner_public_id: UUID
     new_owner_public_id: UUID
     transferred_at: datetime
+
+
+class CommunityLifecycleRead(BaseModel):
+    community_public_id: UUID
+    status: Literal["active", "expired", "archived"]
+    archived_at: datetime | None
+    changed: bool
+    revoked_invite_count: int = Field(ge=0)
 
 
 class CommunityDetailRead(CommunityRead):

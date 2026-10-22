@@ -13,6 +13,7 @@ from app.features.communities.models import Community, CommunityInvite, Communit
 from app.features.communities.schemas import (
     CommunityCreate,
     CommunityInviteRead,
+    CommunityLifecycleRead,
     CommunityMemberRoleRead,
     CommunityOwnershipTransferRead,
     CommunityRead,
@@ -139,11 +140,7 @@ async def list_own_memberships(
             community=CommunityRead.model_validate(community),
             role=membership.role,
             joined_at=membership.joined_at,
-            community_status=(
-                "expired"
-                if community.expires_at is not None and community.expires_at <= now
-                else "active"
-            ),
+            community_status=_community_lifecycle_status(community, now),
         )
         for membership, community in memberships
     ]
@@ -248,6 +245,57 @@ async def set_community_member_role(
     )
 
 
+async def set_community_archived(
+    session: AsyncSession,
+    *,
+    slug: str,
+    owner_id: UUID,
+    owner_public_id: UUID,
+    archived: bool,
+) -> CommunityLifecycleRead:
+    community = await _get_locked_owned_community(
+        session,
+        slug=slug,
+        owner_id=owner_id,
+    )
+    now = datetime.now(UTC)
+    was_archived = community.archived_at is not None
+    changed = was_archived != archived
+    revoked_invite_count = 0
+
+    if changed:
+        if archived:
+            community.archived_at = now
+            revoked_invite_count = await repository.revoke_active_community_invites(
+                session,
+                community_id=community.id,
+                now=now,
+            )
+            event_type = "archived"
+        else:
+            community.archived_at = None
+            event_type = "restored"
+
+        await repository.add_community_lifecycle_event(
+            session,
+            community_id=community.id,
+            community_public_id=community.public_id,
+            actor_user_id=owner_id,
+            actor_public_id=owner_public_id,
+            event_type=event_type,
+            occurred_at=now,
+        )
+
+    await session.commit()
+    return CommunityLifecycleRead(
+        community_public_id=community.public_id,
+        status=_community_lifecycle_status(community, now),
+        archived_at=community.archived_at,
+        changed=changed,
+        revoked_invite_count=revoked_invite_count,
+    )
+
+
 async def transfer_community_ownership(
     session: AsyncSession,
     *,
@@ -317,6 +365,17 @@ async def transfer_community_ownership(
 
 async def discoverable_topics(session: AsyncSession) -> list[str]:
     return await repository.list_public_topics(session)
+
+
+def _community_lifecycle_status(
+    community: Community,
+    now: datetime,
+) -> Literal["active", "expired", "archived"]:
+    if community.archived_at is not None:
+        return "archived"
+    if community.expires_at is not None and community.expires_at <= now:
+        return "expired"
+    return "active"
 
 
 async def create_community(
@@ -407,8 +466,10 @@ async def leave_community(
     )
     now = datetime.now(UTC)
     if membership is None:
-        is_public_and_active = community.access_type == "open" and (
-            community.expires_at is None or community.expires_at > now
+        is_public_and_active = (
+            community.access_type == "open"
+            and (community.expires_at is None or community.expires_at > now)
+            and community.archived_at is None
         )
         if is_public_and_active:
             await session.commit()
@@ -478,6 +539,9 @@ async def create_community_invite(
     if community.access_type != "invite_only":
         await session.rollback()
         raise CommunityInviteConflict("Invites can only be created for invite-only communities")
+    if community.archived_at is not None:
+        await session.rollback()
+        raise CommunityInviteConflict("Archived communities cannot issue invites")
     if community.expires_at is not None and community.expires_at <= now:
         await session.rollback()
         raise CommunityInviteConflict("Expired communities cannot issue invites")
@@ -603,6 +667,9 @@ async def accept_community_invite(
         raise CommunityInviteUnavailable
 
     now = datetime.now(UTC)
+    if community.archived_at is not None:
+        await session.rollback()
+        raise CommunityInviteUnavailable
     if invite.revoked_at is not None or invite.expires_at <= now:
         await session.rollback()
         raise CommunityInviteUnavailable

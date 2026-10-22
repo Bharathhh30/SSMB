@@ -1,6 +1,6 @@
 # Phase 3 — Communities, discovery, access, and roles
 
-**Status:** In progress — public discovery, authenticated community creation, open-community join/leave, owner read/update, invite lifecycle, self-memberships, owner/moderator roster reads, audited owner-controlled moderator assignment/removal, and audited ownership transfer are implemented and PostgreSQL-tested. Archive semantics remain.
+**Status:** In progress — public discovery, authenticated community creation, open-community join/leave, owner read/update, invite lifecycle, self-memberships, owner/moderator roster reads, audited owner-controlled moderator assignment/removal, audited ownership transfer, and reversible community archive/restore are implemented and PostgreSQL-tested. Moderator action permissions and production audit retention remain.
 **Goal:** Make the core discover → join → participate journey work with enforceable community access rules.
 
 ## Backend-first sequencing
@@ -16,6 +16,7 @@ Gate.
 - Add search/filter/pagination and a safe public preview.
 - Implement join/leave, access requests if selected, shareable invite creation/revocation/acceptance, and invite abuse limits.
 - Add memberships, founder/moderator/member roles, moderator assignment/removal, ownership transfer, and member roster privacy. **Approved roster rule (October 22, 2026):** only the community owner and its moderators can view member identities; public/non-member views retain aggregate counts only, and arbitrary users' cross-community membership histories stay private.
+- **Approved archive rule (October 22, 2026):** owner-controlled reversible archive; never hard-delete in this phase; hide archived communities from discovery/public previews, block new joins and invite acceptance, revoke active unused invites, retain memberships/data, and allow owner restore. Restored communities require fresh invites; expired communities remain undiscoverable after restore.
 - Add contract tests for discovery and all community mutations; include
   anonymous/member/founder/moderator cases, cross-community access, expiry,
   invite replay/revocation, duplicates, and concurrent membership changes.
@@ -99,6 +100,16 @@ frontend implementation before backend completion.
 - [x] PostgreSQL-test self/non-member/cross-community targets, owner-only
   access, concurrent transfers, resulting roles, leave permissions, audit
   snapshots, and migration upgrade/downgrade/re-upgrade.
+- [x] Add owner-only archive and restore operations; keep archived communities
+  and memberships for owner/member reads while hiding them from public
+  discovery and previews.
+- [x] Block joins and invite acceptance while archived; revoke active unused
+  invites on archive and require fresh invites after restore.
+- [x] Record archive/restore audit events and make repeated archive/restore
+  operations idempotent.
+- [x] PostgreSQL-test discovery/topic/preview visibility, retained membership
+  status, owner/member leave behavior, invite revocation and restore behavior,
+  audit events, and the `0011_community_archive` migration.
 - [x] Include the current owner/moderator/member total in the public community
   detail response without exposing member identities.
 - [x] Distinguish authenticated management denial (`403`) from a missing
@@ -109,13 +120,14 @@ frontend implementation before backend completion.
   support idempotent same-user acceptance, and prevent cross-user replay.
 - [x] Rate-limit invite creation and acceptance using the shared HMAC-backed
   PostgreSQL rate-limit store.
-- [ ] Define archive/deletion semantics before implementing lifecycle actions.
+- [x] Define and implement the reversible archive lifecycle; permanent
+  community deletion remains out of scope for this phase.
 - [x] Keep arbitrary profile-to-community membership lookup private; the
   cross-community membership endpoint is self-scoped only.
 
-Community deletion/archive semantics, access requests, and moderator action
-permissions remain explicit contract work for their respective endpoint
-slices. Role and ownership audit histories store public-identifier snapshots;
+Permanent community deletion, access requests, and moderator action permissions
+remain explicit contract work for their respective endpoint slices. Role,
+ownership, and lifecycle audit histories store public-identifier snapshots;
 retention/anonymization policy remains a production/account-deletion decision.
 Invite policy is approved: owner-created, single-use, revocable tokens,
 expiring within seven days, accepted only by verified signed-in accounts.
