@@ -1,0 +1,504 @@
+# Community Platform — Cumulative Product and Engineering Roadmap
+
+**Status:** Implementation in progress
+**Last updated:** 2026-10-22
+**Product source:** `../Community_Platform_Concept.md`
+**Repository guidance:** `../AGENTS.md`
+
+This is the cumulative source of truth for product scope, interfaces, technical direction, delivery, and phase gates. Detailed phase checklists live in `plan/phases/`. Work proceeds in order, but each phase may be split into independently reviewable vertical slices.
+
+**Implementation sequencing update (2026-10-19):** Work is now backend-first.
+Freeze mobile/frontend feature changes until every backend domain has a tested
+API contract and the Backend Completion Gate in
+`BACKEND_FIRST_EXECUTION.md` passes. Preserve the existing Expo prototype; do
+not expand it or discard it. This changes implementation order, not product
+scope, and deployment remains last.
+
+## 1. Product direction
+
+Build a mobile-first community platform for people to discover and participate in topic-based groups. The initial concept emphasizes study communities; the agreed product scope includes the full concept: communities, moderation, content/files, messaging, events/room reservations, reminders/notifications, voice, and streaks. These are delivered progressively rather than all at once.
+
+### Product principles
+
+- Safe by default: privacy, consent, moderation, and reporting are designed into the domain model and UI.
+- Useful before social: make it easy to find a relevant community, join, coordinate, and share trustworthy material.
+- Mobile-first and accessible: both iOS and Android are first-class release targets.
+- Reliable under poor connectivity: clear loading/offline/error states, retryable actions, and no misleading success UI.
+- Incremental architecture: begin with a modular monolith and managed services; add complexity only for a measured need.
+
+### Initial personas
+
+1. **Member/learner:** discovers groups, joins, participates, shares materials, and attends sessions.
+2. **Founder:** creates a community, configures access, invites people, and manages moderators.
+3. **Moderator:** reviews reports, applies policy actions, and helps keep a community safe.
+4. **Platform operator:** handles escalations, abuse, account/security issues, and service health.
+
+These personas are planning assumptions based on the concept document; validate them during Phase 0.
+
+## 2. Agreed technical baseline
+
+| Area | Direction |
+|---|---|
+| Mobile | React Native + Expo + TypeScript; iOS and Android |
+| Routing | Expo Router, subject to Phase 0 confirmation during scaffold |
+| API | Python + FastAPI, versioned under `/api/v1` |
+| Database | PostgreSQL |
+| Schema changes | Alembic migrations only |
+| Architecture | Modular monolith; feature-oriented backend modules |
+| Source control / CI | Existing GitHub Actions workflow is optional regression coverage during local prototyping; required branch gates follow prototype approval |
+| Mobile delivery | Expo Go for the local prototype; EAS builds and store release after the final draft |
+| Hosting | Local FastAPI + PostgreSQL via Docker Compose now; choose hosted API/database after prototype signoff |
+
+Do not introduce an ORM, authentication vendor, object-storage vendor, push provider, voice vendor, or hosting provider as a settled choice until it is recorded in a short decision note. The implementation proposal is SQLAlchemy 2.x with Alembic, Pydantic settings, a managed PostgreSQL service, private object storage, and a managed real-time voice service; validate fit and current pricing before adoption.
+
+## 3. User-facing interfaces and navigation
+
+### Mobile navigation model
+
+**Unauthenticated stack**
+
+- Welcome / value proposition
+- Sign up, sign in, verify email/phone as selected, password reset
+- Terms, privacy, and consent entry points
+
+**Authenticated primary tabs**
+
+1. **Home** — joined communities, upcoming sessions, unread activity, personalized shortcuts.
+2. **Discover** — search by name/topic, curated categories, filters, public community preview.
+3. **Create** — create community or scheduled activity (permission-aware).
+4. **Inbox** — direct and community conversations, unread state, notification preferences.
+5. **Profile** — profile, memberships, saved material, settings, privacy, help, and account actions.
+
+The exact tab layout and labels are a design validation item, not a backend constraint.
+
+### Screen/interface inventory by domain
+
+| Domain | Interfaces / flows |
+|---|---|
+| Identity | Welcome, registration/login, verification, password reset, session expiry, account recovery |
+| Profile | View/edit profile, interests/topics, privacy controls, block list, account deletion |
+| Communities | Discover/search/filter, preview, create/edit/archive/expire, member list, join/leave, invite link, access request |
+| Roles | Founder controls, moderator assignment/removal, member permissions, ownership transfer |
+| Community home | About/rules, announcements, activity feed, upcoming events, members, materials, chat entry |
+| Content | Text post, link, PDF/document upload and preview, save/bookmark, delete/edit, report |
+| Messaging | Conversation list, community text chat, replies, attachments where permitted, unread/read state, block/report |
+| Scheduling | Event/session create/edit/cancel, calendar/list views, RSVP/notify-me, reminder controls |
+| Rooms | Availability, reservation, conflict/error, reservation detail, cancellation, capacity and access controls |
+| Notifications | In-app notification center, push opt-in, per-community preferences, mute/snooze |
+| Moderation | Report composer, confirmation/status, moderator queue, report detail, action history, escalation queue |
+| Voice | Voice room lobby, permissions/device checks, join/leave, participant state, mute/deafen, host/moderator controls, connection failure/rejoin |
+| Engagement | Streak summary, activity history, reminder opt-in, pause/quiet hours, privacy controls |
+| Settings/support | Notification/privacy/security settings, app preferences, FAQ/contact, legal documents, delete/export account |
+
+Every screen contract must specify: entry point, actor/permission, input validation, loading/empty/error/offline states, analytics event (if approved), and accessibility behavior.
+
+### Permission model
+
+- **Platform operator:** platform-level policy and escalations, tightly restricted and audited.
+- **Founder/owner:** full community administration, moderator management, ownership transfer, archive.
+- **Moderator:** roster-read-only in the current community API phase; no management/enforcement writes until the Phase 7 moderator permission and safety contract is implemented.
+- **Member:** participate and manage own content; actions depend on community access rules.
+- **Visitor:** view only public preview fields and public content explicitly designated as such.
+
+All permission checks are enforced by the API, not only hidden in the mobile UI. Define a permission matrix before the first protected write endpoint.
+
+## 4. Backend/API interface map
+
+The following is a planning-level resource map. Exact schemas, pagination, idempotency, and error formats are defined in Phase 0 API contracts and implemented with OpenAPI generated from FastAPI.
+
+| Capability | Representative API surface |
+|---|---|
+| Auth | `POST /auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/password-reset`; verification endpoints as selected |
+| Current user | `GET/PATCH /users/me`, `DELETE /users/me`, profile and privacy settings |
+| Discovery | `GET /communities`, `GET /topics`, `GET /communities/{id}` |
+| Communities | `POST /communities`, `PATCH/DELETE /communities/{id}`, archive/expire actions |
+| Membership | `POST /communities/{id}/join`, `/leave`, access requests, member list and role actions |
+| Invites | Create/revoke invite, resolve invite code/link, accept invite |
+| Content | Community posts, links, comments/reactions if approved, saved items, content removal |
+| Files | Upload-intent, completion, metadata, authorized download; bytes stored outside PostgreSQL |
+| Messaging | Conversation list, message history/send/edit/delete, read cursor; real-time delivery channel negotiated in phase |
+| Events/rooms | Event CRUD, RSVP/notify-me, availability, reservation/cancellation, reminders |
+| Notifications | Notification inbox/read state, preferences, device token registration/removal |
+| Moderation | Submit report, report queue/detail, action/audit record, escalation and appeal workflow |
+| Voice | Voice-room/session metadata and authorized join credentials; media flows through selected voice provider |
+| Health/ops | Liveness/readiness, version/build metadata, metrics and internal admin surfaces |
+
+### API conventions
+
+- Prefix public API routes with `/api/v1`; maintain an OpenAPI contract and compatibility policy.
+- Use UUID identifiers, UTC timestamps, explicit enum values, bounded pagination, request validation, and stable error envelopes.
+- Enforce object-level authorization and tenant/community scoping on every access.
+- Use idempotency for retry-prone creates (payments are not currently in scope; reservations and uploads still need safe retries).
+- Never include secrets, password hashes, private moderation notes, or unauthorized member data in responses.
+- Use REST for normal CRUD. Add WebSocket or a managed real-time channel only for live messaging/presence; document reconnect, ordering, authorization, rate limits, and fallback behavior.
+
+## 5. Data-domain map
+
+Initial PostgreSQL domains (not a final physical schema):
+
+- Identity: users, credentials/identity-provider references, sessions/refresh-token families, verification challenges, devices.
+- Profile: public profile fields, interests/topics, account/privacy preferences, blocks.
+- Community: communities, topics, memberships, roles/permissions, join requests, invites, lifecycle/expiry.
+- Content: posts, links, comments/reactions if approved, attachments metadata, saved items.
+- Communication: conversations, participants, messages, read cursors, delivery metadata.
+- Scheduling: events/sessions, RSVPs, room resources, reservations, reminder jobs/subscriptions.
+- Trust and safety: reports, report evidence references, moderator actions, escalation records, appeals, audit events.
+- Engagement: activity ledger and streak snapshots; avoid making a streak the source of truth for other business data.
+- Operations: notification outbox, idempotency records, feature flags/config where justified.
+
+Use foreign keys, uniqueness constraints, check constraints, and indexes to encode invariants. Store uploaded binaries in private object storage and use short-lived authorized URLs. Define retention, export, deletion, and audit-log access rules before collecting sensitive data.
+
+## 6. Target repository organization
+
+```text
+.
+├── mobile/
+│   ├── app/                       # Expo Router route files only
+│   ├── src/
+│   │   ├── features/              # auth, communities, chat, events, moderation, ...
+│   │   ├── components/            # shared UI
+│   │   ├── services/api/          # one typed API client
+│   │   ├── config/env.ts          # validated public runtime/build config
+│   │   ├── hooks/
+│   │   ├── theme/
+│   │   └── utils/
+│   ├── assets/
+│   ├── .env.example
+│   ├── app.config.ts
+│   └── eas.json
+├── backend/
+│   ├── app/
+│   │   ├── api/v1/
+│   │   ├── core/                  # settings, security, errors, logging
+│   │   ├── db/                    # session, base, transaction helpers
+│   │   ├── features/              # feature router/schema/service/repository/model
+│   │   ├── integrations/          # storage, email, push, voice adapters
+│   │   └── main.py
+│   ├── alembic/
+│   ├── tests/
+│   ├── pyproject.toml
+│   └── .env.example
+├── infra/                         # deploy definitions and operational config
+├── docs/                          # ADRs, API/security/operations documentation
+├── plan/
+│   ├── ROADMAP.md
+│   └── phases/
+├── mobile/.env.example
+├── .github/workflows/
+├── AGENTS.md
+└── README.md
+```
+
+This is the intended structure, not a request to create all application directories before Phase 1. Keep `mobile/app` route-only. Keep generated clients/artifacts out of hand-maintained domain logic.
+
+## 7. URL and environment workflow
+
+During the prototype, use only the local API URL in
+`mobile/.env.development.local`. Do not create public domains or EAS
+environments yet. The environment matrix below is a later delivery target, not
+a Phase 1 prerequisite.
+
+### Quick local/tunnel setup
+
+1. Copy `mobile/.env.example` to `mobile/.env.development.local` (ignored by Git).
+2. Set `EXPO_PUBLIC_API_BASE_URL` to the backend API origin plus `/api/v1`. For a friend testing remotely, use the current HTTPS backend tunnel address, not a private LAN address.
+3. Start the Expo development server with its tunnel option when the tester cannot reach the developer machine over LAN. Expo prints a temporary development-server URL/QR code; that is the **mobile bundle/Metro server** URL and is not the FastAPI URL.
+4. Keep the backend tunnel running too. A tunnel for Expo does not automatically expose FastAPI. Update only the API base URL in the ignored env file when the backend tunnel changes, then restart/reload the Expo app so its bundled public config is refreshed.
+5. Share the Expo QR/link and ensure the tester has the compatible Expo Go or project development build. Custom native features may require a development build rather than Expo Go.
+
+### Environment matrix
+
+| Environment | Mobile config | API/database | Delivery |
+|---|---|---|---|
+| Local | ignored `.env.development.local`; Expo dev server on LAN/tunnel | local API and disposable local PostgreSQL; optional temporary HTTPS tunnels | Expo Go for quick smoke tests; use a project development build for representative production-feature testing and custom native modules |
+| Development | EAS development profile and development variables | isolated dev deployment and database | internal builds/OTA only when compatible |
+| Staging | staging variables and staging API | isolated staging API/database/storage | internal QA/TestFlight track |
+| Production | production variables supplied securely at build/release time | production API/database/storage, custom HTTPS API domain | signed app-store binaries; controlled compatible OTA updates if enabled |
+
+Keep the tracked `.env.example` as a non-secret template. Do not commit real tunnel URLs, `.env.development.local`, signing material, API keys, or server secrets. `EXPO_PUBLIC_*` is public client configuration, not secret storage. Backend secrets belong in the deployment platform's secret manager.
+
+The initial app is mobile, so it does not have a static frontend website URL. If a website is later added, store its canonical URL as a distinct setting; never confuse it with Expo's per-run development tunnel.
+
+## 8. Git and release strategy
+
+The branch rules below describe the eventual release model. During prototype
+review, short-lived feature commits and local checks are sufficient; protected
+branch gates and automatic deployments are deferred.
+
+Use the requested environment branches while keeping feature work short-lived:
+
+- `develop`: integration branch; successful merge deploys to the development environment.
+- `staging`: release-candidate branch; promote tested `develop` changes here via reviewed PR; deploys to staging.
+- `main`: protected production branch; promote the verified staging commit via reviewed PR/tag; production release requires approval.
+- `feature/<ticket>-<short-name>` and `fix/<ticket>-<short-name>`: branch from `develop`, PR back to `develop`.
+- `hotfix/<ticket>-<short-name>`: branch from `main`, PR to `main`, then forward-merge/cherry-pick the fix into `staging` and `develop`.
+
+Protect environment branches, disallow direct pushes, require green CI and review, and record the promoted commit/build. Avoid long-lived developer-specific branches. Reassess after the team and release process are established; environment isolation should primarily come from deployment environments and secrets, not branch names alone.
+
+Commit format: `type(scope): imperative summary`, e.g. `feat(events): add session reminders`, `fix(api): enforce community membership`, `docs(plan): define release gates`. Use `feat`, `fix`, `docs`, `refactor`, `test`, `build`, `ci`, and `chore` consistently.
+
+## 9. CI/CD and deployment model
+
+This is the post-prototype target. Keep the existing checks available, but
+defer required status rules, EAS delivery, cloud deployment jobs, secrets, and
+automatic promotions until the owner approves the final prototype and selects
+a host.
+
+### Pull-request CI
+
+- Mobile: install from lockfile, formatter/linter, TypeScript check, unit/component tests, Expo dependency/config diagnostics, and a production-like export/build check as feasible.
+- Backend: locked dependency install, Ruff format/lint, static typing as adopted, unit/API tests, security/dependency checks.
+- Database: PostgreSQL-backed integration tests; validate Alembic head and upgrade from the previous revision; fail on unexplained model/migration drift.
+- Shared: secret scanning, license/dependency review policy, PR template, artifact/log retention, required status checks.
+
+### Continuous deployment
+
+- Merge to `develop`: deploy backend to isolated development; run migration and smoke tests; create internal mobile build when useful.
+- Promote to `staging`: deploy backend to staging, migrate once, run smoke/API/mobile end-to-end tests and internal iOS/Android distribution.
+- Promote/tag `main`: require approval, deploy backend with backward-compatible migration and health checks, then submit signed mobile binaries through the store release process.
+- Support rollback of application images and app releases. Database rollback is not assumed safe; use forward-fix/restore plans and backward-compatible migrations.
+- Keep mobile and backend release numbers/build metadata correlated. Roll out app updates gradually and monitor crashes, API errors, latency, and adoption.
+
+### Infrastructure requirements before public launch
+
+- Separate secrets, databases, storage buckets, push credentials, signing credentials, and access policies by environment.
+- HTTPS, least-privilege IAM, private database networking where supported, rate limits, request size limits, secure headers where applicable, and restrictive CORS for any web client.
+- Structured redacted logs, error reporting, service metrics, traces for critical paths, uptime/readiness checks, actionable alerts, and operational ownership.
+- Automated encrypted backups with documented retention and successful restore drills; database migration and recovery runbooks.
+- Privacy policy, terms, data deletion/export, account support, store metadata, permission rationale, and content moderation/report response process.
+
+## 10. Security, privacy, and trust/safety baseline
+
+- Passwords use a modern adaptive password hash; tokens are short-lived/rotatable and handled with platform-appropriate secure storage. Never log credentials, tokens, private message content by default, or signed URLs.
+- Validate and authorize every request; apply community tenancy checks, abuse throttles, upload type/size scanning, and safe external-link handling.
+- Use short-lived signed upload/download URLs for private files; verify object ownership and authorization server-side.
+- Collect only necessary data; define data deletion, export, retention, and age/consent requirements before launch.
+- A report threshold of five reports is a configurable **signal to queue/escalate for human review**, not automatic proof or an automatic ban. Rate-limit and deduplicate report abuse, preserve evidence with access controls, and audit moderator actions.
+- Define moderation policy, emergency escalation, appeals, moderator permissions, response expectations, and safety staffing before opening communities broadly.
+- Voice permissions, recording policy, blocking/reporting, room moderation, and consent must be resolved before launching voice.
+
+## 11. Quality gates and measurable acceptance
+
+- Critical journeys have automated tests: signup/login/session recovery, discover/join, create/invite, share/download file, message/reconnect, RSVP/reserve/cancel, report/review/escalate, voice join/leave, and reminders.
+- No unresolved critical/high security finding; access-control tests prove cross-community data isolation.
+- Migrations are reviewed and tested against a representative prior schema; backup restore is rehearsed before production launch.
+- Mobile experience is manually tested on supported iOS and Android devices, including permission denial, poor network, app resume, and accessibility basics.
+- Release candidate has no known release-blocking crashes, migration failures, or critical user-journey defects; rollback and support owners are named.
+- Product metrics and retention analytics require privacy review and opt-in/notice decisions where applicable; collect no unnecessary message/file content.
+
+## 12. Phases and exit gates
+
+Detailed tasks, outputs, and acceptance checks are in the linked files.
+
+| Phase | Scope | Exit gate |
+|---|---|---|
+| 0 — Product decisions & design contracts | Validate personas, MVP sequence, permissions, privacy/moderation policy, providers, UX/API contracts, risk decisions | Approved scope, key architecture decisions, interface map, acceptance criteria |
+| 1 — Backend foundation | Local FastAPI/PostgreSQL, Alembic, API conventions, endpoint edge coverage, disposable database test workflow | Backend tests and migrations run reproducibly with PostgreSQL; mobile work is frozen |
+| 2 — Identity & profile APIs | Authentication, verification/recovery, sessions, profile and account controls | Secure endpoint journeys and authorization/abuse tests |
+| 3 — Community APIs | Create/manage/search/join/leave, access, invites, membership and roles | End-to-end API behavior and owner/moderator permissions tested |
+| 4 — Content and file APIs | Posts, links, documents, private storage boundary and saved items | Secure API sharing and upload/download edge tests |
+| 5 — Messaging and notification APIs | Conversations, messages, delivery boundaries, inbox and preferences | Reconnect/history, authorization, retries and abuse tests |
+| 6 — Scheduling APIs | Events, reservations, RSVP, conflicts and reminders | Timezone, concurrency/idempotency and cancellation tests |
+| 7 — Moderation APIs | Reports, queues, escalation, actions, audit and appeals | Human-review rules, abuse resistance and access-control tests |
+| 8 — Voice APIs | Authorized room/session control and provider adapter boundary | Policy/provider decisions, safety contract and failure tests |
+| 9 — Engagement APIs | Activity ledger, streak calculation and user-controlled reminder settings | Deterministic timezone, duplicate-event and privacy tests |
+| Backend Completion Gate | All backend domains, migrations, OpenAPI contracts, security and edge-case tests complete | No skipped PostgreSQL tests; every endpoint has its applicable test matrix |
+| Frontend integration (deferred) | Resume Expo feature work and connect complete user journeys to the tested API | Cross-platform journeys pass against the local backend; no direct DB access |
+| 10 — Final production readiness & launch | Final provider/domain choices, hosting, CI/CD, store delivery, hardening, runbooks and rollout | Go/no-go, restore/rollback rehearsal, monitoring and support in place |
+
+## 13. Open decisions register
+
+Must be resolved in the indicated phase; absence of a choice must not block planning but does block the affected implementation.
+
+| Decision | Proposed evaluation / default | Due |
+|---|---|---|
+| Product name, brand, public domain, and native app IDs | Decide after the prototype is approved; use an owned namespace for permanent store identifiers | 10 |
+| Audience, age floor, initial locale | Validate launch audience and legal/privacy requirements before identity and public launch | 0/2 |
+| Expo Router and state/data libraries | Prefer Expo Router; choose state, query/cache, and forms libraries based on supported versions and team comfort | 0 |
+| Auth method | **Approved:** email/password with verified email and account recovery; no social sign-in initially. Email delivery remains behind a replaceable adapter. | 2 |
+| Community invites | **Approved:** owner-created, single-use, revocable token; maximum 7-day lifetime; verified signed-in acceptance; raw token shown once and hash-only persistence. | 3 |
+| Community name uniqueness | **Approved:** global, case-insensitive uniqueness after trimming; migration suffixes legacy duplicates while preserving internal IDs. | 3 |
+| Public resource identifiers | **Approved:** API responses and public slugs must not expose database primary keys; use independent public UUIDs and immutable public slugs after migration. | 3 |
+| Community roster privacy | **Approved (October 22, 2026):** only a community owner or moderator can view that community's member identities; public previews expose aggregate counts only; arbitrary users' cross-community membership histories remain private. | 3 |
+| Moderator role management | **Approved (October 22, 2026):** owners alone can promote existing members to moderators or demote moderators to members; the owner role uses a separate transfer operation; changes are transactionally audited and same-role retries are no-ops. Moderators may read the roster only until Phase 7 defines and tests enforcement permissions. | 3/7 |
+| Ownership transfer | **Implemented contract (October 22, 2026):** current owner can transfer only to an existing member; target becomes the sole owner, former owner becomes a regular member, and the change is atomic and audited. | 3 |
+| Community archive lifecycle | **Approved (October 22, 2026):** reversible soft archive, no hard deletion in this phase; hide from public surfaces, block joins/invites, revoke active unused invites, retain memberships/data, allow owner restore; restored links remain revoked. | 3 |
+| Community access requests | Not selected for the current open/invite-only API scope. Decide whether to add request/review flows, expiry, notifications, and abuse controls before expanding access types. | 3 |
+| Permanent community deletion | No hard-delete API in Phase 3. Define who may request deletion, how dependent content/invites/audit records are handled, and recovery/retention behavior before implementing deletion. | 10 |
+| Role audit retention/anonymization | Decide retention period, access, and account/community deletion behavior for audit events and public-ID snapshots before deletion flows or production launch. | 2/10 |
+| Temporary mobile audit exception | Owner-approved allowlist limited to GHSA-vfj7-8cjw-p6xm (`braces`) and GHSA-86w9-cpqp-85rv (`node-forge`), only while npm reports no compatible fix; expires November 5, 2026. CI must fail on any other high/critical advisory, any newly available fix, or after expiry. | Review by expiry |
+| Cloud provider, region, deployment target, budget | Compare managed container hosting, managed PostgreSQL, storage, backups, data residency, and egress cost after prototype signoff | 10 |
+| ORM and DB access | Validate SQLAlchemy async/sync approach, pooling, transaction boundaries, and migration tooling | 0 |
+| Email, push, object storage | Pick providers and define adapters, deliverability, costs, residency, and failure policy | 0/4/5 |
+| Real-time messaging | Compare managed realtime vs FastAPI WebSockets; document ordering, presence, offline, reconnect, scaling | 5 |
+| Room reservation meaning | Confirm whether “room” means virtual audio room, physical/online resource booking, or both; current plan allows both domains | 6 |
+| Voice service | Compare cross-platform SDKs, moderation, region/cost, recording policy, quality, and provider portability | 8 |
+| Report threshold/policy | Keep five as configurable escalation threshold; define evidence, duplicate/brigading handling, actions, appeals, staffing | 0/7 |
+| Branch / CI provider | GitHub Actions is the working assumption; confirm repository and store access model | 1 |
+| Analytics/observability vendors | Decide minimal privacy-preserving set and retention before telemetry collection | 1/10 |
+
+## 14. Current implementation checkpoint
+
+Phase 1 is now explicitly local-prototype work. The Expo shell, themed Home and
+Discover screens, FastAPI health endpoints, PostgreSQL/Alembic foundation,
+initial users/communities revision, open-community discovery API, centralized
+mobile API URL configuration, a read-only public community preview route with
+native-share support and reduced-motion-aware content entrance are implemented.
+A non-root backend container build definition is in place. GitHub Actions CI
+includes mobile API contract tests and is configured to build/smoke-test that
+image. The API adds request IDs and redacted structured access logs. The preview
+link is an app deep link, not an invite link or production HTTPS universal link.
+Mobile API errors surface validated request IDs as selectable support references.
+
+Home is a guest-safe welcome and topic launcher, not a fictional joined-community
+dashboard; the member dashboard remains pending identity/membership. Discover
+uses the API and has loading, error, empty, search, topic-filter, and pagination
+states, including pull-to-refresh that retains loaded results on refresh failure.
+Its available topic filters now come from `GET /api/v1/topics`, which
+lists distinct topics with active open communities; Home and Discover handle
+topic loading/failure without blocking the all-communities view. The API
+intentionally does not return invite-only communities until a
+public-preview policy is decided. The backend now supports community creation,
+open join/leave, owner-only metadata management, self-membership discovery, a
+paginated owner/moderator-only roster, and reversible owner-managed archive/
+restore; the Expo prototype remains frozen until the Backend Completion Gate.
+The development seed command is explicit and refuses to run outside
+`APP_ENV=development`.
+
+The first GitHub Actions run is complete. Its backend/PostgreSQL job passed the
+Alembic migration, repository integration tests, and Docker image readiness
+smoke test. The mobile job passed installation, Expo compatibility, unit tests,
+typecheck, and web/iOS/Android exports, but failed at `npm audit` on the two
+documented upstream high advisories. The initial Alembic migration and
+readiness endpoint were also verified against an isolated, temporary
+PostgreSQL 18 cluster; the developer's existing PostgreSQL service was not
+modified. The hosted CI workflow is retained as optional regression coverage;
+its audit failure is not a blocker to opening the local prototype, but must be
+resolved before making remote CI a required release gate.
+
+The mobile URL template now defaults to a local FastAPI address, and the Expo Go
+instructions cover iOS Simulator, Android Emulator, and physical devices on a
+trusted Wi-Fi network. EAS profiles, custom development-client builds, package
+IDs, brand/domain decisions, hosted API environments, branch protections, and
+production deployment are intentionally deferred until the user approves the
+prototype. Remote `develop` and `staging` branch names exist as scaffolding;
+feature pushes do not trigger hosted CI during prototype iteration. The user
+reports inspecting the UI in Android Studio. We still need to confirm the
+API-backed discovery/preview flow there and capture feedback; Expo Go access
+from this Windows host is blocked by its group-policy-managed inbound firewall.
+
+The SQLAlchemy async/asyncpg choice is provisional and recorded in
+`../docs/decisions/0001-async-sqlalchemy.md`; revisit it at the Phase 0
+architecture decision gate before production. Hosting and external service
+provider choices remain unresolved as listed above. The owner has approved the
+email/password, verified-email, and account-recovery approach in
+`../docs/decisions/0002-email-password-authentication.md`.
+
+Before the backend-first pivot, local-only identity UI exploration was added:
+Home links to welcome, sign-up, and sign-in screens, with guest browsing
+preserved. The forms
+only validate draft input in memory and explicitly do not transmit or save it;
+they do not create accounts or sessions. Email/password is a provisional screen
+prototype screens, not backend work. Authentication method is now approved;
+age/audience, email delivery, and profile persistence remain gated on their
+phase decisions. A profile setup/preview screen now demonstrates a
+display name and sample interest selection entirely in screen memory; its
+interest taxonomy, profile visibility, and persistence are not decisions.
+See `phases/PHASE-02-identity-onboarding.md`.
+These screens are prototypes only and do not count as completed backend work.
+
+The mobile prototype is now frozen while backend work takes priority. The
+backend-first order, API edge-case matrix, completion gate, and current test
+baseline are maintained in `BACKEND_FIRST_EXECUTION.md`. Existing mobile code
+and CI checks remain preserved, but no new frontend feature work should begin
+until the backend gate passes.
+
+The first backend hardening slice is verified: community-discovery query and
+slug boundaries, literal wildcard behavior, pagination stability, visibility
+filters, and PostgreSQL readiness failures are tested. The full suite passed
+39/39 against a fresh migrated PostgreSQL 18 test cluster. No frontend files
+were changed in this slice.
+
+Phase 2 backend now includes identity/session/action-token and rate-limit
+migrations; registration, verification/resend, sign-in, `/me`, refresh/logout,
+recovery/reset, and self-profile read/update endpoints. The 55-test suite passed
+against a fresh PostgreSQL 18 database, and the copy/paste API smoke flow passed
+with Mailpit. Durable email retry/outbox and scheduled expired-rate-bucket
+cleanup, profile privacy/block/account controls, and production email
+configuration remain outstanding.
+
+The Phase 3 backend foundation slice adds Alembic revision
+`0005_community_memberships`, verified-user community creation, normalized
+request fields, optional future expiry, readable unique slugs, and an atomic
+founder/owner membership, including a data backfill for communities that
+predate the membership table. Authenticated users can idempotently join active
+open communities and leave non-owner memberships; row locking and database
+uniqueness protect concurrent membership changes. Invite-only and expired
+communities remain hidden from non-member join/leave attempts, and owners cannot
+leave before ownership transfer exists. Migration SQL was reviewed; upgrade
+from `0004` backfilled a pre-existing founder, downgrade/re-upgrade succeeded,
+and Alembic reported no model drift. Public community detail includes member
+count without exposing identities. Management routes distinguish authenticated
+non-owner `403` responses from unknown-community `404` responses and document
+those outcomes. The expanded suite passed 91/91 tests against an isolated
+PostgreSQL 18 cluster with zero skips, including exact count and
+owner/non-owner/unknown status cases.
+
+Invite policy is approved: owner-created, single-use, revocable links expire
+within seven days and require verified signed-in acceptance. Alembic revision
+`0006_community_invites` stores only token hashes. Owners can create, list, and
+revoke invite metadata; acceptance is replay-safe for the same account,
+rejects other-account reuse, respects community expiry, and is rate-limited.
+The shareable app URL will be constructed by the client, not tied to a backend
+domain. The full suite passed 101/101 tests with zero skips against isolated
+PostgreSQL 18; the new migration was reviewed, downgraded/re-upgraded, and
+Alembic reported no drift. At this invite checkpoint, archive behavior,
+moderator controls, and ownership transfer remained; subsequent checkpoints
+below record the later role and transfer work. No mobile files were changed.
+
+After the owner reported duplicate community names, creation now rejects
+case/whitespace-equivalent names with `409 Conflict`. Alembic revision
+`0007_unique_community_names` deterministically renames legacy duplicates
+(keeping internal IDs) before adding a PostgreSQL unique index. A seeded
+pre-migration PostgreSQL test kept the original `California` and existing
+`California (2)` rows intact, renamed conflicting rows with collision-free
+numeric suffixes, preserved every slug, and found no duplicate normalized
+names afterward. Concurrent create tests also confirmed one success and one
+`409`. Migration `0008_public_resource_ids` adds independent public UUIDs for
+users, communities, and invites; new community slugs use the public UUID, not
+the internal database primary key. Existing community slugs are rotated to
+public UUIDs (old local share links will need to be refreshed); API DTOs return
+public identifiers or slugs and omit internal primary keys. A seeded pre-`0008`
+row confirmed slug rotation uses its separate public UUID while preserving the
+internal row ID. `GET /communities/mine` lets owners retrieve refreshed slugs,
+including for private communities. `GET /communities/memberships/me` lists only
+the authenticated user's own owner/member/moderator memberships; it does not
+provide arbitrary-user roster lookup. The owner/moderator-only
+`GET /communities/{slug}/members` roster is paginated and returns only user
+public IDs, display names, roles, and join timestamps; non-managers cannot see
+member identities. The approved policy keeps public previews aggregate-only
+and arbitrary users' cross-community membership histories private. Owners can
+promote/demote existing members through an owner-only API; changes are
+transactionally recorded in `community_role_changes` and no-op retries create
+no audit record. Alembic `0009_community_role_audit` was reviewed and
+upgrade/downgrade/re-upgrade verified. The full suite passed 104/104 tests
+with zero skips against isolated PostgreSQL 18. Ruff lint and formatting
+checks passed. Audit snapshot retention/anonymization remains a production and
+account-deletion decision.
+
+The current Phase 3 ownership-transfer API lets the current owner transfer to
+an existing member. The target becomes the sole owner and the former owner
+becomes a regular member. Alembic `0010_ownership_transfer` adds a partial
+unique owner-membership index and a separate transfer audit table. Migration
+and role/ownership endpoints passed **105/105 tests with zero skips** on
+isolated PostgreSQL 18; upgrade/downgrade/re-upgrade and drift checks passed.
+The reversible archive lifecycle hides archived communities from public
+surfaces, revokes active unused invitations, and retains memberships and data.
+Alembic `0011_community_archive` adds archive state and lifecycle audit events.
+Archive, transfer, role, and existing APIs passed **106/106 tests with zero
+skips** on isolated PostgreSQL 18; migration rollback/re-upgrade and drift
+checks passed. Alembic `0012_community_admin_audit` now records metadata
+changed-field names and invite revokers without logging submitted text values.
+Moderator writes remain deferred to Phase 7 under the approved roster-read-only
+baseline. Phase 3's agreed backend API scope is complete; permanent deletion,
+access requests, and audit retention/anonymization remain deferred.

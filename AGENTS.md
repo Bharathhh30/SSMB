@@ -49,3 +49,4 @@
 - Build all agreed product capabilities in phases; do not silently drop voice, moderation, files, reminders, room reservations, or engagement features from scope.
 - Record unresolved product/provider decisions as explicit decisions to make, with a phase gate. Do not invent a vendor, legal policy, pricing model, or moderation policy as if it were confirmed.
 - When implementation begins, update phase status and acceptance criteria as work is completed.
+- Current sequencing decision: freeze mobile/frontend feature work and complete the backend APIs, PostgreSQL migrations, and endpoint edge-case tests before resuming frontend integration. Follow `plan/BACKEND_FIRST_EXECUTION.md`; this changes ordering, not agreed product scope. Deployment remains last.
