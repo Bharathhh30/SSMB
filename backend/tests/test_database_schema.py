@@ -1,6 +1,6 @@
 from alembic.config import Config
 from alembic.script import ScriptDirectory
-from sqlalchemy import CheckConstraint, Index, UniqueConstraint
+from sqlalchemy import CheckConstraint, ForeignKeyConstraint, Index, UniqueConstraint
 
 import app.db.models as _models  # noqa: F401
 from app.db.base import Base
@@ -15,6 +15,7 @@ def test_initial_models_register_user_and_community_tables() -> None:
         "communities",
         "community_invites",
         "community_memberships",
+        "community_role_changes",
         "users",
         "user_interests",
     }
@@ -63,6 +64,25 @@ def test_initial_models_register_user_and_community_tables() -> None:
         and constraint.name == "ck_community_invites_not_consumed_and_revoked"
         for constraint in invites.constraints
     )
+    role_changes = Base.metadata.tables["community_role_changes"]
+    assert role_changes.c.community_public_id.nullable is False
+    assert role_changes.c.actor_public_id.nullable is False
+    assert role_changes.c.target_public_id.nullable is False
+    assert any(
+        isinstance(constraint, CheckConstraint)
+        and constraint.name == "ck_community_role_changes_role_changed"
+        for constraint in role_changes.constraints
+    )
+    role_change_foreign_keys = [
+        constraint
+        for constraint in role_changes.constraints
+        if isinstance(constraint, ForeignKeyConstraint)
+    ]
+    assert len(role_change_foreign_keys) == 3
+    assert all(
+        {foreign_key.ondelete for foreign_key in constraint.elements} == {"SET NULL"}
+        for constraint in role_change_foreign_keys
+    )
     users = Base.metadata.tables["users"]
     assert users.c.public_id.nullable is False
     assert users.c.email.nullable is True
@@ -78,10 +98,10 @@ def test_initial_models_register_user_and_community_tables() -> None:
     )
 
 
-def test_public_resource_identifier_migration_is_the_single_head() -> None:
+def test_community_role_audit_migration_is_the_single_head() -> None:
     script = ScriptDirectory.from_config(Config("alembic.ini"))
 
-    assert script.get_heads() == ["0008_public_resource_ids"]
+    assert script.get_heads() == ["0009_community_role_audit"]
     assert (
         script.get_revision("0004_private_user_interests").down_revision == "0003_auth_rate_limits"
     )
@@ -98,4 +118,7 @@ def test_public_resource_identifier_migration_is_the_single_head() -> None:
     assert (
         script.get_revision("0008_public_resource_ids").down_revision
         == "0007_unique_community_names"
+    )
+    assert (
+        script.get_revision("0009_community_role_audit").down_revision == "0008_public_resource_ids"
     )

@@ -110,6 +110,57 @@ class CommunityMembership(Base):
     )
 
 
+class CommunityRoleChange(Base):
+    __tablename__ = "community_role_changes"
+    __table_args__ = (
+        CheckConstraint(
+            "previous_role IN ('member', 'moderator')",
+            name="ck_community_role_changes_previous_role",
+        ),
+        CheckConstraint(
+            "new_role IN ('member', 'moderator')",
+            name="ck_community_role_changes_new_role",
+        ),
+        CheckConstraint(
+            "previous_role <> new_role",
+            name="ck_community_role_changes_role_changed",
+        ),
+        Index(
+            "ix_community_role_changes_community_changed_at",
+            "community_public_id",
+            "changed_at",
+        ),
+        Index("ix_community_role_changes_target_public_id", "target_public_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    community_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("communities.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    community_public_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    actor_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    actor_public_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    target_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    target_public_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    previous_role: Mapped[str] = mapped_column(String(20), nullable=False)
+    new_role: Mapped[str] = mapped_column(String(20), nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
 class CommunityInvite(Base):
     __tablename__ = "community_invites"
     __table_args__ = (

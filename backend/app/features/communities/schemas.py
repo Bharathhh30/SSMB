@@ -68,6 +68,19 @@ class CommunityRosterPage(BaseModel):
     offset: int
 
 
+class CommunityMemberRoleUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["member", "moderator"]
+
+
+class CommunityMemberRoleRead(BaseModel):
+    user_public_id: UUID
+    previous_role: Literal["member", "moderator"]
+    role: Literal["member", "moderator"]
+    changed: bool
+
+
 class CommunityDetailRead(CommunityRead):
     member_count: int = Field(
         ge=0,

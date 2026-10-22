@@ -6,7 +6,12 @@ from app.features.auth.models import (
     AuthRefreshToken,
     AuthSession,
 )
-from app.features.communities.models import Community, CommunityInvite, CommunityMembership
+from app.features.communities.models import (
+    Community,
+    CommunityInvite,
+    CommunityMembership,
+    CommunityRoleChange,
+)
 from app.features.profiles.models import UserInterest
 from app.features.users.models import User
 
@@ -18,6 +23,7 @@ __all__ = [
     "Community",
     "CommunityInvite",
     "CommunityMembership",
+    "CommunityRoleChange",
     "User",
     "UserInterest",
 ]

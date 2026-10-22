@@ -30,7 +30,7 @@ voice, and engagement remain included.
 | 0 | Product decisions | Resolve only decisions needed before each affected API; define endpoint and permission contracts | Open; keep unresolved decisions explicit |
 | 1 | Engineering foundation | FastAPI, PostgreSQL, Alembic, local test database, health/readiness, API conventions, stable errors/logging | Foundation exists; endpoint edge coverage and repeatable DB test setup need work |
 | 2 | Identity and profile | Registration/sign-in, verification/recovery, sessions, profile, preferences, account controls | Auth and private self-profile endpoints implemented/tested; privacy, block, deletion/export APIs remain |
-| 3 | Communities and discovery | Create/read/update/archive, join/leave/requests, invites, memberships, roles, ownership, access rules | Discovery, create/manage, join/leave, single-use invites, owner/self-membership lists, and owner/moderator roster reads are implemented and PostgreSQL-tested; archive, role assignment/removal, and ownership transfer remain |
+| 3 | Communities and discovery | Create/read/update/archive, join/leave/requests, invites, memberships, roles, ownership, access rules | Discovery, create/manage, join/leave, single-use invites, owner/self-membership lists, owner/moderator roster reads, and audited owner-only moderator assignment/removal are PostgreSQL-tested; archive and ownership transfer remain |
 | 4 | Content and files | Posts, links, saved items, file metadata, upload/download authorization and storage adapter | Not implemented; storage and retention decisions remain open |
 | 5 | Messaging and notifications | Conversations, messages, read cursors, notification inbox/outbox, delivery adapters | Not implemented; realtime and push decisions remain open |
 | 6 | Scheduling and reservations | Events, RSVP, resource availability/reservation, reminder scheduling | Not implemented; reservation semantics remain open |
@@ -100,6 +100,7 @@ reason rather than silently omitting it.
 | `PATCH /api/v1/communities/{slug}` | Owner updates name, topic, description, access type, or expiry; slug remains stable; non-owner gets 403 and unknown slug gets 404 | Anonymous, non-owner/member status/message, blank/null/oversized fields, empty patch, extra fields, invalid expiry, explicit expiry clear, concurrent writes |
 | `GET /api/v1/communities/memberships/me` | Authenticated caller lists their own current membership records, including owned communities; returns public community data and role | Anonymous, bounded pagination, ordering, expired-community status, no arbitrary user lookup or internal ID leakage |
 | `GET /api/v1/communities/{slug}/members` | Community owner or moderator lists the current roster; returns user public IDs, display names, roles, and join times only | Anonymous/member/unrelated owner denial, unknown slug, private/expired owner access, cross-community isolation, pagination, no email/internal ID leakage |
+| `PUT /api/v1/communities/{slug}/members/{user_public_id}/role` | Owner sets an existing member to `moderator` or `member`; actual changes are transactionally audited and retries are idempotent | Anonymous/non-owner, owner-target conflict, unknown/cross-community target, invalid/extra fields, concurrent writes, exactly one event for a concurrent repeated change, audit response/DB allowlist |
 | `GET /api/v1/profile/me` | Authenticated caller's public ID, display name, and private interests | Missing/expired/revoked auth, no internal ID/email/hash leakage, empty interests |
 | `PATCH /api/v1/profile/me` | Update caller's display name; add/remove private interests | Blank/null/unknown/oversized/duplicate values, atomic add/remove behavior, clearing interests |
 
@@ -257,6 +258,25 @@ is a client of the API; it never connects directly to PostgreSQL.
 - Owner/moderator access, member and cross-community denials, unknown-community
   behavior, pagination, and response allowlisting passed the isolated
   PostgreSQL 18 integration suite. Full suite: **102 passed, 0 skipped**.
-- No schema migration was needed. Moderator assignment/removal and ownership
-  transfer are still separate work; moderators cannot yet be assigned through
-  an API.
+- No schema migration was needed for the roster endpoint. Moderator role
+  assignment/removal was implemented in the following slice; ownership
+  transfer remains separate work.
+
+## 10. Community moderator role management (October 22, 2026)
+
+- Only the community owner may promote an existing member to moderator or
+  demote a moderator to member. Moderators cannot manage roles; owner changes
+  are reserved for the ownership-transfer operation. Setting a member's
+  current role again is an idempotent no-op.
+- `PUT /api/v1/communities/{slug}/members/{user_public_id}/role` identifies
+  targets by public UUID and only searches within the requested community.
+  Non-member and cross-community targets are indistinguishable `404`s. Owner
+  targets receive `409`; non-owners receive `403`.
+- Alembic `0009_community_role_audit` adds constrained role-change history.
+  Membership updates and audit inserts commit in one transaction. No-op
+  retries do not create events. Audit events contain public-ID snapshots;
+  retention/anonymization must be decided before account/community deletion
+  or production launch. Downgrading this revision drops its audit history.
+- The migration's generated PostgreSQL SQL was reviewed. Upgrade, downgrade
+  to `0008`, re-upgrade, and Alembic drift checks passed on isolated
+  PostgreSQL 18. Full suite: **104 passed, 0 skipped**.

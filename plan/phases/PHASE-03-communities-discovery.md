@@ -1,6 +1,6 @@
 # Phase 3 — Communities, discovery, access, and roles
 
-**Status:** In progress — public discovery, authenticated community creation, open-community join/leave, owner read/update, invite lifecycle, self-memberships, and owner/moderator roster reads are implemented and PostgreSQL-tested. Archiving, role assignment/removal, and ownership transfer remain.
+**Status:** In progress — public discovery, authenticated community creation, open-community join/leave, owner read/update, invite lifecycle, self-memberships, owner/moderator roster reads, and audited owner-controlled moderator assignment/removal are implemented and PostgreSQL-tested. Archiving and ownership transfer remain.
 **Goal:** Make the core discover → join → participate journey work with enforceable community access rules.
 
 ## Backend-first sequencing
@@ -81,6 +81,14 @@ frontend implementation before backend completion.
 - [x] PostgreSQL-test roster authorization, invite-only/expired community
   access for authorized roles, cross-community isolation, pagination, and
   response-field allowlisting.
+- [x] Allow only owners to promote an existing member to moderator or demote
+  an existing moderator to member; forbid changing the owner through this API.
+- [x] Make role changes idempotent, serialize concurrent changes, and persist
+  append-style audit events with actor/target/community references and public
+  identifier snapshots. No-op role writes do not create audit events.
+- [x] PostgreSQL-test owner/non-owner authorization, target scoping, owner
+  protection, validation, idempotency, concurrency, audit contents, and the
+  `0009_community_role_audit` migration.
 - [x] Include the current owner/moderator/member total in the public community
   detail response without exposing member identities.
 - [x] Distinguish authenticated management denial (`403`) from a missing
@@ -92,14 +100,16 @@ frontend implementation before backend completion.
 - [x] Rate-limit invite creation and acceptance using the shared HMAC-backed
   PostgreSQL rate-limit store.
 - [ ] Define archive/deletion semantics before implementing lifecycle actions.
-- [ ] Implement owner-only moderator assignment/removal with an auditable role
-  history, then ownership transfer with owner-membership invariants.
+- [ ] Implement ownership transfer with owner-membership invariants and
+  audited actor/target handling.
 - [x] Keep arbitrary profile-to-community membership lookup private; the
   cross-community membership endpoint is self-scoped only.
 
-Community deletion/archive semantics, access requests, moderator assignment
-and action permissions, and ownership transfer remain explicit contract work
-for their respective endpoint slices. Invite policy is approved:
+Community deletion/archive semantics, access requests, moderator action
+permissions, and ownership transfer remain explicit contract work for their
+respective endpoint slices. The audit history stores public-identifier
+snapshots; retention/anonymization policy remains a production/account-deletion
+decision. Invite policy is approved:
 owner-created, single-use, revocable tokens, expiring within seven days,
 accepted only by verified signed-in accounts.
 

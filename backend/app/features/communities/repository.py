@@ -4,7 +4,12 @@ from uuid import UUID, uuid4
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.features.communities.models import Community, CommunityInvite, CommunityMembership
+from app.features.communities.models import (
+    Community,
+    CommunityInvite,
+    CommunityMembership,
+    CommunityRoleChange,
+)
 from app.features.users.models import User
 
 PUBLIC_TOPIC_LIMIT = 50
@@ -281,6 +286,56 @@ async def list_community_roster(
     )
     result = await session.execute(statement)
     return [(row[0], row[1]) for row in result.all()], total or 0
+
+
+async def get_community_member_by_public_id(
+    session: AsyncSession,
+    *,
+    community_id: UUID,
+    user_public_id: UUID,
+    for_update: bool = False,
+) -> tuple[CommunityMembership, User] | None:
+    statement = (
+        select(CommunityMembership, User)
+        .join(User, User.id == CommunityMembership.user_id)
+        .where(
+            CommunityMembership.community_id == community_id,
+            User.public_id == user_public_id,
+        )
+    )
+    if for_update:
+        statement = statement.with_for_update(of=CommunityMembership)
+    row = (await session.execute(statement)).one_or_none()
+    return (row[0], row[1]) if row is not None else None
+
+
+async def add_community_role_change(
+    session: AsyncSession,
+    *,
+    community_id: UUID,
+    community_public_id: UUID,
+    actor_user_id: UUID,
+    actor_public_id: UUID,
+    target_user_id: UUID,
+    target_public_id: UUID,
+    previous_role: str,
+    new_role: str,
+) -> CommunityRoleChange:
+    role_change = CommunityRoleChange(
+        id=uuid4(),
+        community_id=community_id,
+        community_public_id=community_public_id,
+        actor_user_id=actor_user_id,
+        actor_public_id=actor_public_id,
+        target_user_id=target_user_id,
+        target_public_id=target_public_id,
+        previous_role=previous_role,
+        new_role=new_role,
+        changed_at=datetime.now(UTC),
+    )
+    session.add(role_change)
+    await session.flush()
+    return role_change
 
 
 async def add_member(

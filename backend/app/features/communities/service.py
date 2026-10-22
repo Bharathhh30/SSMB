@@ -1,6 +1,7 @@
 import re
 import unicodedata
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 from uuid import UUID, uuid4
 
 from sqlalchemy.exc import IntegrityError
@@ -12,6 +13,7 @@ from app.features.communities.models import Community, CommunityInvite, Communit
 from app.features.communities.schemas import (
     CommunityCreate,
     CommunityInviteRead,
+    CommunityMemberRoleRead,
     CommunityRead,
     CommunityRosterMemberRead,
     CommunityUpdate,
@@ -57,6 +59,14 @@ class CommunityInviteUnavailable(Exception):
 
 class CommunityInviteAlreadyUsed(Exception):
     """The invite has already been accepted by another account."""
+
+
+class CommunityMemberNotFound(Exception):
+    """The user is not a current member of the requested community."""
+
+
+class CommunityOwnerRoleConflict(Exception):
+    """The owner role can only be changed through ownership transfer."""
 
 
 async def get_public_community_with_member_count(
@@ -167,6 +177,66 @@ async def list_community_roster(
         for membership, user in memberships
     ]
     return items, total
+
+
+async def set_community_member_role(
+    session: AsyncSession,
+    *,
+    slug: str,
+    owner_id: UUID,
+    owner_public_id: UUID,
+    target_public_id: UUID,
+    role: Literal["member", "moderator"],
+) -> CommunityMemberRoleRead:
+    community = await _get_locked_owned_community(
+        session,
+        slug=slug,
+        owner_id=owner_id,
+    )
+    target = await repository.get_community_member_by_public_id(
+        session,
+        community_id=community.id,
+        user_public_id=target_public_id,
+        for_update=True,
+    )
+    if target is None:
+        await session.rollback()
+        raise CommunityMemberNotFound
+
+    membership, user = target
+    if membership.role == "owner" or user.id == community.owner_id:
+        await session.rollback()
+        raise CommunityOwnerRoleConflict
+
+    previous_role = membership.role
+    if previous_role == role:
+        await session.commit()
+        return CommunityMemberRoleRead(
+            user_public_id=user.public_id,
+            previous_role=previous_role,
+            role=role,
+            changed=False,
+        )
+
+    membership.role = role
+    await repository.add_community_role_change(
+        session,
+        community_id=community.id,
+        community_public_id=community.public_id,
+        actor_user_id=owner_id,
+        actor_public_id=owner_public_id,
+        target_user_id=user.id,
+        target_public_id=user.public_id,
+        previous_role=previous_role,
+        new_role=role,
+    )
+    await session.commit()
+    return CommunityMemberRoleRead(
+        user_public_id=user.public_id,
+        previous_role=previous_role,
+        role=role,
+        changed=True,
+    )
 
 
 async def discoverable_topics(session: AsyncSession) -> list[str]:

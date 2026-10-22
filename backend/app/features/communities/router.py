@@ -15,6 +15,8 @@ from app.features.communities.schemas import (
     CommunityInviteAccept,
     CommunityInviteCreated,
     CommunityInvitePage,
+    CommunityMemberRoleRead,
+    CommunityMemberRoleUpdate,
     CommunityMembershipRead,
     CommunityPage,
     CommunityRead,
@@ -27,10 +29,12 @@ from app.features.communities.service import (
     CommunityInviteAlreadyUsed,
     CommunityInviteConflict,
     CommunityInviteUnavailable,
+    CommunityMemberNotFound,
     CommunityNameConflict,
     CommunityNotFound,
     CommunityNotJoinable,
     CommunityOwnerCannotLeave,
+    CommunityOwnerRoleConflict,
     CommunitySlugConflict,
 )
 
@@ -505,6 +509,55 @@ async def get_community_roster(
             detail="You are not authorized to view this community's member roster.",
         ) from None
     return CommunityRosterPage(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.put(
+    "/{slug}/members/{user_public_id}/role",
+    response_model=CommunityMemberRoleRead,
+    summary="Promote a member to moderator or remove moderator status",
+    description=(
+        "Only the community owner can set an existing member's role to moderator "
+        "or member. Changes are recorded in the internal role audit history."
+    ),
+    responses={
+        403: {"description": "The authenticated user is not the community owner."},
+        404: {"description": "The community or target member does not exist."},
+        409: {"description": "The community owner's role cannot be changed here."},
+    },
+)
+async def update_community_member_role(
+    data: CommunityMemberRoleUpdate,
+    principal: AuthenticatedDependency,
+    session: DatabaseSession,
+    slug: Annotated[
+        str,
+        Path(min_length=1, max_length=140, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$"),
+    ],
+    user_public_id: UUID,
+) -> CommunityMemberRoleRead:
+    try:
+        return await service.set_community_member_role(
+            session,
+            slug=slug,
+            owner_id=principal.user.id,
+            owner_public_id=principal.user.public_id,
+            target_public_id=user_public_id,
+            role=data.role,
+        )
+    except CommunityNotFound:
+        raise HTTPException(status_code=404, detail="Community not found") from None
+    except CommunityForbidden:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not authorized to manage this community.",
+        ) from None
+    except CommunityMemberNotFound:
+        raise HTTPException(status_code=404, detail="Community member not found") from None
+    except CommunityOwnerRoleConflict:
+        raise HTTPException(
+            status_code=409,
+            detail="The community owner role can only be changed through ownership transfer.",
+        ) from None
 
 
 @router.get(

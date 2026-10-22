@@ -71,6 +71,13 @@ verified account. Neither request has a JSON body.
 
 ## Read and update your community
 
+Before testing moderator role changes against your local database, apply the
+new audit-table migration from the `backend` directory:
+
+```powershell
+uv run --locked alembic upgrade head
+```
+
 - `GET /api/v1/communities/mine` lists all communities you own, including
   invite-only and expired ones. Use it to retrieve refreshed slugs after
   applying migration `0008`.
@@ -83,6 +90,36 @@ verified account. Neither request has a JSON body.
   names, roles, and join timestamps, but never internal user IDs or email
   addresses. A regular member or unrelated account receives `403`; an unknown
   slug receives `404`. Public previews continue to show only `member_count`.
+- As the owner, promote or demote an existing member with
+  `PUT /api/v1/communities/{slug}/members/{user_public_id}/role`. Get the
+  target's `user_public_id` from the authorized roster response. Promotion:
+
+```json
+{
+  "role": "moderator"
+}
+```
+
+  Demotion:
+
+```json
+{
+  "role": "member"
+}
+```
+
+  A successful change returns `200` with `previous_role`, the new `role`, and
+  `changed: true`. Repeating the same desired role is idempotent and returns
+  `changed: false` without adding another audit event. Only the community owner
+  can change roles; moderators and members receive `403`. The owner role cannot
+  be modified here (`409`); ownership transfer is a separate operation.
+  Targets who are not current members of that community return `404`, including
+  a user who is a member of a different community.
+- Role changes are persisted to the internal `community_role_changes` audit
+  table; audit history is not exposed by a public endpoint. The migration's
+  downgrade drops that history. Public-ID snapshots are retained if an
+  associated account or community is deleted, so audit retention and
+  anonymization must be decided before production account/community deletion.
 - `GET /api/v1/communities/{slug}/manage` returns a community only to its owner,
   including an invite-only community that is hidden from public preview.
 - `PATCH /api/v1/communities/{slug}` updates only fields supplied in the body.

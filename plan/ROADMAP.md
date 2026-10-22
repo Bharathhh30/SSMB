@@ -320,6 +320,8 @@ Must be resolved in the indicated phase; absence of a choice must not block plan
 | Community name uniqueness | **Approved:** global, case-insensitive uniqueness after trimming; migration suffixes legacy duplicates while preserving internal IDs. | 3 |
 | Public resource identifiers | **Approved:** API responses and public slugs must not expose database primary keys; use independent public UUIDs and immutable public slugs after migration. | 3 |
 | Community roster privacy | **Approved (October 22, 2026):** only a community owner or moderator can view that community's member identities; public previews expose aggregate counts only; arbitrary users' cross-community membership histories remain private. | 3 |
+| Moderator role management | **Approved (October 22, 2026):** owners alone can promote existing members to moderators or demote moderators to members; the owner role uses a separate transfer operation; changes are transactionally audited and same-role retries are no-ops. | 3 |
+| Role audit retention/anonymization | Decide retention period, access, and account/community deletion behavior for audit events and public-ID snapshots before deletion flows or production launch. | 2/10 |
 | Cloud provider, region, deployment target, budget | Compare managed container hosting, managed PostgreSQL, storage, backups, data residency, and egress cost after prototype signoff | 10 |
 | ORM and DB access | Validate SQLAlchemy async/sync approach, pooling, transaction boundaries, and migration tooling | 0 |
 | Email, push, object storage | Pick providers and define adapters, deliverability, costs, residency, and failure policy | 0/4/5 |
@@ -469,7 +471,11 @@ provide arbitrary-user roster lookup. The owner/moderator-only
 `GET /communities/{slug}/members` roster is paginated and returns only user
 public IDs, display names, roles, and join timestamps; non-managers cannot see
 member identities. The approved policy keeps public previews aggregate-only
-and arbitrary users' cross-community membership histories private. The full
-suite passed 102/102 tests with zero skips against isolated PostgreSQL 18.
-Migration `0008` was upgraded/downgraded/re-upgraded and Alembic found no model
-drift. Ruff lint and formatting checks passed.
+and arbitrary users' cross-community membership histories private. Owners can
+promote/demote existing members through an owner-only API; changes are
+transactionally recorded in `community_role_changes` and no-op retries create
+no audit record. Alembic `0009_community_role_audit` was reviewed and
+upgrade/downgrade/re-upgrade verified. The full suite passed 104/104 tests
+with zero skips against isolated PostgreSQL 18. Ruff lint and formatting
+checks passed. Audit snapshot retention/anonymization remains a production and
+account-deletion decision.

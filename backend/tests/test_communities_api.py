@@ -68,6 +68,14 @@ async def patch_json(app: FastAPI, path: str, payload: dict[str, object]) -> Res
         return await client.patch(path, json=payload)
 
 
+async def put_json(app: FastAPI, path: str, payload: dict[str, object]) -> Response:
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        return await client.put(path, json=payload)
+
+
 def get(app: FastAPI, path: str) -> Response:
     return asyncio.run(request(app, path))
 
@@ -86,6 +94,10 @@ def delete(app: FastAPI, path: str) -> Response:
 
 def patch(app: FastAPI, path: str, payload: dict[str, object]) -> Response:
     return asyncio.run(patch_json(app, path, payload))
+
+
+def put(app: FastAPI, path: str, payload: dict[str, object]) -> Response:
+    return asyncio.run(put_json(app, path, payload))
 
 
 def test_discover_communities_returns_a_bounded_page() -> None:
@@ -303,13 +315,22 @@ def test_community_creation_requires_authentication() -> None:
     [
         ("join", "/api/v1/communities/study-circle/join"),
         ("leave", "/api/v1/communities/study-circle/leave"),
+        (
+            "role",
+            f"/api/v1/communities/study-circle/members/{uuid4()}/role",
+        ),
     ],
 )
 def test_membership_changes_require_authentication(method: str, path: str) -> None:
     session = AsyncMock(spec=AsyncSession)
     app = make_test_app(session)
 
-    response = post(app, path, {}) if method == "join" else delete(app, path)
+    if method == "join":
+        response = post(app, path, {})
+    elif method == "role":
+        response = put(app, path, {"role": "moderator"})
+    else:
+        response = delete(app, path)
 
     assert response.status_code == 401
     assert response.json() == {"detail": "Authentication required"}
