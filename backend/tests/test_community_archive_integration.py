@@ -385,6 +385,13 @@ def test_archive_is_reversible_hides_community_and_revokes_unused_invites() -> N
                     (expired_community_public_id, "archived", owner_public_id),
                     (expired_community_public_id, "restored", owner_public_id),
                 }
+                archived_invite = await session.scalar(
+                    select(CommunityInvite).where(
+                        CommunityInvite.public_id == active_invite_public_id
+                    )
+                )
+                assert archived_invite is not None
+                assert archived_invite.revoked_by_user_id == owner_id
         finally:
             async with session_factory() as session:
                 await session.execute(

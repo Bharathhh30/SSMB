@@ -15,6 +15,7 @@ def test_initial_models_register_user_and_community_tables() -> None:
         "communities",
         "community_invites",
         "community_lifecycle_events",
+        "community_metadata_changes",
         "community_memberships",
         "community_ownership_changes",
         "community_role_changes",
@@ -53,6 +54,7 @@ def test_initial_models_register_user_and_community_tables() -> None:
     )
     invites = Base.metadata.tables["community_invites"]
     assert invites.c.public_id.nullable is False
+    assert invites.c.revoked_by_user_id.nullable is True
     assert any(
         isinstance(constraint, UniqueConstraint)
         and constraint.name == "uq_community_invites_public_id"
@@ -111,6 +113,10 @@ def test_initial_models_register_user_and_community_tables() -> None:
         and constraint.name == "ck_community_lifecycle_events_event_type"
         for constraint in lifecycle_events.constraints
     )
+    metadata_changes = Base.metadata.tables["community_metadata_changes"]
+    assert metadata_changes.c.community_public_id.nullable is False
+    assert metadata_changes.c.actor_public_id.nullable is False
+    assert metadata_changes.c.changed_fields.nullable is False
     users = Base.metadata.tables["users"]
     assert users.c.public_id.nullable is False
     assert users.c.email.nullable is True
@@ -126,10 +132,10 @@ def test_initial_models_register_user_and_community_tables() -> None:
     )
 
 
-def test_community_archive_migration_is_the_single_head() -> None:
+def test_community_admin_audit_migration_is_the_single_head() -> None:
     script = ScriptDirectory.from_config(Config("alembic.ini"))
 
-    assert script.get_heads() == ["0011_community_archive"]
+    assert script.get_heads() == ["0012_community_admin_audit"]
     assert (
         script.get_revision("0004_private_user_interests").down_revision == "0003_auth_rate_limits"
     )
@@ -154,3 +160,6 @@ def test_community_archive_migration_is_the_single_head() -> None:
         script.get_revision("0010_ownership_transfer").down_revision == "0009_community_role_audit"
     )
     assert script.get_revision("0011_community_archive").down_revision == "0010_ownership_transfer"
+    assert (
+        script.get_revision("0012_community_admin_audit").down_revision == "0011_community_archive"
+    )

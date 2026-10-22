@@ -92,6 +92,9 @@ uv run --locked alembic upgrade head
   names, roles, and join timestamps, but never internal user IDs or email
   addresses. A regular member or unrelated account receives `403`; an unknown
   slug receives `404`. Public previews continue to show only `member_count`.
+  Moderators are roster-read-only for now: metadata edits, role changes,
+  ownership transfer, archiving, and invite management remain owner-only.
+  Enforcement actions are deferred to Phase 7.
 - As the owner, promote or demote an existing member with
   `PUT /api/v1/communities/{slug}/members/{user_public_id}/role`. Get the
   target's `user_public_id` from the authorized roster response. Promotion:
@@ -181,6 +184,13 @@ and be in the future. Empty patches and explicit nulls for name/topic/
 description/access type return `422`. Authenticated non-owners receive
 `403 Forbidden` with a clear authorization message; unknown slugs return
 `404 Not Found`. A `403` response never includes private community data.
+  Actual metadata changes are recorded internally with the owner and changed
+  field names; submitted text values are not copied into this audit record.
+  Repeating an update with identical values creates no additional event.
+- Manual invite revocation and archive-triggered revocation record the actor
+  in `revoked_by_user_id`; invite creation already records its creator.
+- Alembic `0012_community_admin_audit` adds metadata-change history and invite
+  revoker attribution. Downgrading removes this audit information.
 
 ## Create, accept, and revoke an invite
 

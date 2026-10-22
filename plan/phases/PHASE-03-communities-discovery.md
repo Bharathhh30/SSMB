@@ -1,6 +1,6 @@
 # Phase 3 — Communities, discovery, access, and roles
 
-**Status:** In progress — public discovery, authenticated community creation, open-community join/leave, owner read/update, invite lifecycle, self-memberships, owner/moderator roster reads, audited owner-controlled moderator assignment/removal, audited ownership transfer, and reversible community archive/restore are implemented and PostgreSQL-tested. Moderator action permissions and production audit retention remain.
+**Status:** Complete — agreed community APIs, owner/moderator roster access, audited role/ownership/lifecycle/metadata operations, and reversible archive/restore are implemented and PostgreSQL-tested. Moderators are roster-read-only until Phase 7; permanent deletion and audit retention remain deferred.
 **Goal:** Make the core discover → join → participate journey work with enforceable community access rules.
 
 ## Backend-first sequencing
@@ -17,6 +17,7 @@ Gate.
 - Implement join/leave, access requests if selected, shareable invite creation/revocation/acceptance, and invite abuse limits.
 - Add memberships, founder/moderator/member roles, moderator assignment/removal, ownership transfer, and member roster privacy. **Approved roster rule (October 22, 2026):** only the community owner and its moderators can view member identities; public/non-member views retain aggregate counts only, and arbitrary users' cross-community membership histories stay private.
 - **Approved archive rule (October 22, 2026):** owner-controlled reversible archive; never hard-delete in this phase; hide archived communities from discovery/public previews, block new joins and invite acceptance, revoke active unused invites, retain memberships/data, and allow owner restore. Restored communities require fresh invites; expired communities remain undiscoverable after restore.
+- **Approved moderator rule (October 22, 2026):** moderators may read their community roster, but have no community-management or enforcement write permissions until the moderation contract is implemented in Phase 7.
 - Add contract tests for discovery and all community mutations; include
   anonymous/member/founder/moderator cases, cross-community access, expiry,
   invite replay/revocation, duplicates, and concurrent membership changes.
@@ -90,6 +91,19 @@ frontend implementation before backend completion.
 - [x] PostgreSQL-test owner/non-owner authorization, target scoping, owner
   protection, validation, idempotency, concurrency, audit contents, and the
   `0009_community_role_audit` migration.
+- [x] Keep moderators read-only in community management during Phase 3:
+  allow roster reads but deny metadata, role, invite, archive, and ownership
+  mutations. Defer moderation/enforcement writes to Phase 7.
+- [x] Audit metadata changes by actor and changed field names without storing
+  text values; avoid duplicate audit events for no-op patches.
+- [x] Record the actor for manual and archive-triggered invite revocation.
+- [x] PostgreSQL-test the moderator read-only matrix and metadata/invite audit
+  attribution, including no-op metadata patches.
+- [x] Audit owner metadata updates by actor and changed field names without
+  copying community text values into the audit log; identical-value patches
+  create no duplicate event.
+- [x] Record the actor who revokes an invite, including active invites revoked
+  as part of community archiving.
 - [x] Allow only the current owner to transfer ownership to an existing member
   of the same community; promote the target to owner and make the former owner
   a regular member.
@@ -125,10 +139,12 @@ frontend implementation before backend completion.
 - [x] Keep arbitrary profile-to-community membership lookup private; the
   cross-community membership endpoint is self-scoped only.
 
-Permanent community deletion, access requests, and moderator action permissions
-remain explicit contract work for their respective endpoint slices. Role,
-ownership, and lifecycle audit histories store public-identifier snapshots;
-retention/anonymization policy remains a production/account-deletion decision.
+Permanent community deletion and access requests are deferred, not silently
+removed from the product backlog. Moderator enforcement writes are deferred to
+Phase 7; until then, moderators may only read their community roster. Role,
+ownership, lifecycle, and metadata audit histories store public-identifier
+snapshots; retention/anonymization policy remains a production/account-deletion
+decision. With those explicit gates, the Phase 3 backend scope is complete.
 Invite policy is approved: owner-created, single-use, revocable tokens,
 expiring within seven days, accepted only by verified signed-in accounts.
 

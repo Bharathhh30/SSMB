@@ -379,6 +379,13 @@ def test_owner_invites_are_single_use_revocable_expiring_and_rate_limited() -> N
                 assert first_member_id in member_ids
                 assert replay_user_id not in member_ids
                 assert (race_user_a in member_ids) != (race_user_b in member_ids)
+                revoked_invite = await session.scalar(
+                    select(CommunityInvite).where(
+                        CommunityInvite.public_id == revoke_invite_public_id
+                    )
+                )
+                assert revoked_invite is not None
+                assert revoked_invite.revoked_by_user_id == owner_id
         finally:
             async with session_factory() as session:
                 await session.execute(

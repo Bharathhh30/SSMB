@@ -2,6 +2,7 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -244,6 +245,37 @@ class CommunityLifecycleEvent(Base):
     )
 
 
+class CommunityMetadataChange(Base):
+    __tablename__ = "community_metadata_changes"
+    __table_args__ = (
+        Index(
+            "ix_community_metadata_changes_community_changed_at",
+            "community_public_id",
+            "changed_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    community_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("communities.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    community_public_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    actor_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    actor_public_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    changed_fields: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
 class CommunityInvite(Base):
     __tablename__ = "community_invites"
     __table_args__ = (
@@ -283,6 +315,11 @@ class CommunityInvite(Base):
         nullable=True,
     )
     accepted_by_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    revoked_by_user_id: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,

@@ -1,4 +1,6 @@
 import asyncio
+import hashlib
+import hmac
 import os
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
@@ -12,6 +14,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core.config import Settings
 from app.features.auth.dependencies import require_authenticated_principal
+from app.features.auth.models import AuthRateLimitBucket
 from app.features.communities.models import Community, CommunityMembership
 from app.features.users.models import User
 from app.main import create_app
@@ -51,6 +54,12 @@ def test_community_roster_is_limited_to_owner_and_moderators() -> None:
             other_owner_id: "Other community owner",
         }
         suffix = uuid4().hex
+        rate_limit_secret = uuid4().hex
+        invite_rate_limit_hash = hmac.new(
+            rate_limit_secret.encode(),
+            f"community_invite_create\0{moderator_id}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
         community_slug = f"private-roster-{suffix}"
         other_community_slug = f"other-roster-{suffix}"
         community_public_ids = [community_public_id, other_community_public_id]
@@ -130,11 +139,15 @@ def test_community_roster_is_limited_to_owner_and_moderators() -> None:
             settings = Settings(
                 app_env="test",
                 database_url=SecretStr(TEST_DATABASE_URL),
+                auth_rate_limit_secret=SecretStr(rate_limit_secret),
             )
             app = create_app(settings)
             active_user_id = {"value": owner_id}
             app.dependency_overrides[require_authenticated_principal] = lambda: SimpleNamespace(
-                user=SimpleNamespace(id=active_user_id["value"])
+                user=SimpleNamespace(
+                    id=active_user_id["value"],
+                    public_id=user_public_ids[active_user_id["value"]],
+                )
             )
 
             async with app.router.lifespan_context(app):
@@ -162,6 +175,28 @@ def test_community_roster_is_limited_to_owner_and_moderators() -> None:
                     active_user_id["value"] = moderator_id
                     moderator_page = await client.get(
                         f"/api/v1/communities/{community_slug}/members"
+                    )
+                    moderator_manage = await client.get(
+                        f"/api/v1/communities/{community_slug}/manage"
+                    )
+                    moderator_metadata_update = await client.patch(
+                        f"/api/v1/communities/{community_slug}",
+                        json={"name": "Unauthorized moderator rename"},
+                    )
+                    moderator_role_update = await client.put(
+                        f"/api/v1/communities/{community_slug}/members/"
+                        f"{user_public_ids[member_id]}/role",
+                        json={"role": "moderator"},
+                    )
+                    moderator_transfer = await client.post(
+                        f"/api/v1/communities/{community_slug}/transfer-ownership",
+                        json={"new_owner_public_id": str(user_public_ids[member_id])},
+                    )
+                    moderator_archive = await client.put(
+                        f"/api/v1/communities/{community_slug}/archive"
+                    )
+                    moderator_invite = await client.post(
+                        f"/api/v1/communities/{community_slug}/invites"
                     )
                     active_user_id["value"] = member_id
                     member_response = await client.get(
@@ -206,6 +241,12 @@ def test_community_roster_is_limited_to_owner_and_moderators() -> None:
             )
             assert moderator_page is not None and moderator_page.status_code == 200
             assert moderator_page.json()["total"] == 3
+            assert moderator_manage.status_code == 403
+            assert moderator_metadata_update.status_code == 403
+            assert moderator_role_update.status_code == 403
+            assert moderator_transfer.status_code == 403
+            assert moderator_archive.status_code == 403
+            assert moderator_invite.status_code == 403
             assert [item["user_public_id"] for item in moderator_page.json()["items"]] == [
                 item["user_public_id"] for item in first_items + second_items
             ]
@@ -223,6 +264,11 @@ def test_community_roster_is_limited_to_owner_and_moderators() -> None:
             async with session_factory() as session:
                 await session.execute(
                     delete(Community).where(Community.public_id.in_(community_public_ids))
+                )
+                await session.execute(
+                    delete(AuthRateLimitBucket).where(
+                        AuthRateLimitBucket.bucket_key_hash == invite_rate_limit_hash
+                    )
                 )
                 await session.execute(delete(User).where(User.id.in_(user_ids)))
                 await session.commit()

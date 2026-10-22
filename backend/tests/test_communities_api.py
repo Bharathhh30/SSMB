@@ -601,8 +601,9 @@ def test_owner_can_read_and_update_community_without_changing_its_slug(
     )
     session = AsyncMock(spec=AsyncSession)
     app = make_test_app(session)
+    owner_public_id = uuid4()
     app.dependency_overrides[require_authenticated_principal] = lambda: SimpleNamespace(
-        user=SimpleNamespace(id=owner_id)
+        user=SimpleNamespace(id=owner_id, public_id=owner_public_id)
     )
     get_owned = AsyncMock(return_value=community)
     update_owned = AsyncMock(return_value=community)

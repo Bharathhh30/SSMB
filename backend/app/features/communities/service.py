@@ -269,6 +269,7 @@ async def set_community_archived(
             revoked_invite_count = await repository.revoke_active_community_invites(
                 session,
                 community_id=community.id,
+                revoked_by_user_id=owner_id,
                 now=now,
             )
             event_type = "archived"
@@ -504,6 +505,7 @@ async def update_owned_community(
     *,
     slug: str,
     owner_id: UUID,
+    owner_public_id: UUID,
     data: CommunityUpdate,
 ) -> Community:
     community = await repository.get_owned_community(
@@ -518,8 +520,24 @@ async def update_owned_community(
         await session.rollback()
         raise CommunityForbidden
 
-    for field in data.model_fields_set:
-        setattr(community, field, getattr(data, field))
+    changed_fields = []
+    for field in sorted(data.model_fields_set):
+        old_value = getattr(community, field)
+        new_value = getattr(data, field)
+        if old_value != new_value:
+            setattr(community, field, new_value)
+            changed_fields.append(field)
+
+    if changed_fields:
+        await repository.add_community_metadata_change(
+            session,
+            community_id=community.id,
+            community_public_id=community.public_id,
+            actor_user_id=owner_id,
+            actor_public_id=owner_public_id,
+            changed_fields=changed_fields,
+            changed_at=datetime.now(UTC),
+        )
     await session.commit()
     return community
 
@@ -635,6 +653,7 @@ async def revoke_community_invite(
         return
 
     invite.revoked_at = datetime.now(UTC)
+    invite.revoked_by_user_id = owner_id
     await session.commit()
 
 

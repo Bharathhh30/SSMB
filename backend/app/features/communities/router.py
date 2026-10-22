@@ -460,6 +460,7 @@ async def update_owned_community(
             session,
             slug=slug,
             owner_id=principal.user.id,
+            owner_public_id=principal.user.public_id,
             data=data,
         )
     except CommunityNotFound:

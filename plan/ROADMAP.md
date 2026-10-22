@@ -96,7 +96,7 @@ Every screen contract must specify: entry point, actor/permission, input validat
 
 - **Platform operator:** platform-level policy and escalations, tightly restricted and audited.
 - **Founder/owner:** full community administration, moderator management, ownership transfer, archive.
-- **Moderator:** community-scoped member/content/report/event management as defined by policy.
+- **Moderator:** roster-read-only in the current community API phase; no management/enforcement writes until the Phase 7 moderator permission and safety contract is implemented.
 - **Member:** participate and manage own content; actions depend on community access rules.
 - **Visitor:** view only public preview fields and public content explicitly designated as such.
 
@@ -320,9 +320,11 @@ Must be resolved in the indicated phase; absence of a choice must not block plan
 | Community name uniqueness | **Approved:** global, case-insensitive uniqueness after trimming; migration suffixes legacy duplicates while preserving internal IDs. | 3 |
 | Public resource identifiers | **Approved:** API responses and public slugs must not expose database primary keys; use independent public UUIDs and immutable public slugs after migration. | 3 |
 | Community roster privacy | **Approved (October 22, 2026):** only a community owner or moderator can view that community's member identities; public previews expose aggregate counts only; arbitrary users' cross-community membership histories remain private. | 3 |
-| Moderator role management | **Approved (October 22, 2026):** owners alone can promote existing members to moderators or demote moderators to members; the owner role uses a separate transfer operation; changes are transactionally audited and same-role retries are no-ops. | 3 |
+| Moderator role management | **Approved (October 22, 2026):** owners alone can promote existing members to moderators or demote moderators to members; the owner role uses a separate transfer operation; changes are transactionally audited and same-role retries are no-ops. Moderators may read the roster only until Phase 7 defines and tests enforcement permissions. | 3/7 |
 | Ownership transfer | **Implemented contract (October 22, 2026):** current owner can transfer only to an existing member; target becomes the sole owner, former owner becomes a regular member, and the change is atomic and audited. | 3 |
 | Community archive lifecycle | **Approved (October 22, 2026):** reversible soft archive, no hard deletion in this phase; hide from public surfaces, block joins/invites, revoke active unused invites, retain memberships/data, allow owner restore; restored links remain revoked. | 3 |
+| Community access requests | Not selected for the current open/invite-only API scope. Decide whether to add request/review flows, expiry, notifications, and abuse controls before expanding access types. | 3 |
+| Permanent community deletion | No hard-delete API in Phase 3. Define who may request deletion, how dependent content/invites/audit records are handled, and recovery/retention behavior before implementing deletion. | 10 |
 | Role audit retention/anonymization | Decide retention period, access, and account/community deletion behavior for audit events and public-ID snapshots before deletion flows or production launch. | 2/10 |
 | Cloud provider, region, deployment target, budget | Compare managed container hosting, managed PostgreSQL, storage, backups, data residency, and egress cost after prototype signoff | 10 |
 | ORM and DB access | Validate SQLAlchemy async/sync approach, pooling, transaction boundaries, and migration tooling | 0 |
@@ -494,5 +496,8 @@ surfaces, revokes active unused invitations, and retains memberships and data.
 Alembic `0011_community_archive` adds archive state and lifecycle audit events.
 Archive, transfer, role, and existing APIs passed **106/106 tests with zero
 skips** on isolated PostgreSQL 18; migration rollback/re-upgrade and drift
-checks passed. Permanent community deletion, moderator action permissions,
-and audit retention/anonymization remain open; no mobile files were changed.
+checks passed. Alembic `0012_community_admin_audit` now records metadata
+changed-field names and invite revokers without logging submitted text values.
+Moderator writes remain deferred to Phase 7 under the approved roster-read-only
+baseline. Phase 3's agreed backend API scope is complete; permanent deletion,
+access requests, and audit retention/anonymization remain deferred.

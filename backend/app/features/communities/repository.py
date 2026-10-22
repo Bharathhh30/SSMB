@@ -9,6 +9,7 @@ from app.features.communities.models import (
     CommunityInvite,
     CommunityLifecycleEvent,
     CommunityMembership,
+    CommunityMetadataChange,
     CommunityOwnershipChange,
     CommunityRoleChange,
 )
@@ -377,6 +378,7 @@ async def revoke_active_community_invites(
     session: AsyncSession,
     *,
     community_id: UUID,
+    revoked_by_user_id: UUID,
     now: datetime,
 ) -> int:
     result = await session.execute(
@@ -387,7 +389,7 @@ async def revoke_active_community_invites(
             CommunityInvite.revoked_at.is_(None),
             CommunityInvite.expires_at > now,
         )
-        .values(revoked_at=now)
+        .values(revoked_at=now, revoked_by_user_id=revoked_by_user_id)
     )
     return max(result.rowcount or 0, 0)
 
@@ -414,6 +416,30 @@ async def add_community_lifecycle_event(
     session.add(event)
     await session.flush()
     return event
+
+
+async def add_community_metadata_change(
+    session: AsyncSession,
+    *,
+    community_id: UUID,
+    community_public_id: UUID,
+    actor_user_id: UUID,
+    actor_public_id: UUID,
+    changed_fields: list[str],
+    changed_at: datetime,
+) -> CommunityMetadataChange:
+    change = CommunityMetadataChange(
+        id=uuid4(),
+        community_id=community_id,
+        community_public_id=community_public_id,
+        actor_user_id=actor_user_id,
+        actor_public_id=actor_public_id,
+        changed_fields=changed_fields,
+        changed_at=changed_at,
+    )
+    session.add(change)
+    await session.flush()
+    return change
 
 
 async def add_member(

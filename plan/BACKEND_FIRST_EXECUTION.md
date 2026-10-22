@@ -30,8 +30,8 @@ voice, and engagement remain included.
 | 0 | Product decisions | Resolve only decisions needed before each affected API; define endpoint and permission contracts | Open; keep unresolved decisions explicit |
 | 1 | Engineering foundation | FastAPI, PostgreSQL, Alembic, local test database, health/readiness, API conventions, stable errors/logging | Foundation exists; endpoint edge coverage and repeatable DB test setup need work |
 | 2 | Identity and profile | Registration/sign-in, verification/recovery, sessions, profile, preferences, account controls | Auth and private self-profile endpoints implemented/tested; privacy, block, deletion/export APIs remain |
-| 3 | Communities and discovery | Create/read/update/archive, join/leave/requests, invites, memberships, roles, ownership, access rules | Discovery, create/manage, join/leave, single-use invites, owner/self-membership lists, owner/moderator roster reads, audited role/ownership changes, and reversible archive/restore are PostgreSQL-tested; moderator action permissions remain |
-| 4 | Content and files | Posts, links, saved items, file metadata, upload/download authorization and storage adapter | Not implemented; storage and retention decisions remain open |
+| 3 | Communities and discovery | Create/read/update/archive, join/leave/requests, invites, memberships, roles, ownership, access rules | **Complete for the agreed backend API scope**; access requests and permanent deletion are deferred, and moderator enforcement writes belong to Phase 7 |
+| 4 | Content and files | Posts, links, saved items, file metadata, upload/download authorization and storage adapter | Next phase; not started; storage and retention decisions remain open |
 | 5 | Messaging and notifications | Conversations, messages, read cursors, notification inbox/outbox, delivery adapters | Not implemented; realtime and push decisions remain open |
 | 6 | Scheduling and reservations | Events, RSVP, resource availability/reservation, reminder scheduling | Not implemented; reservation semantics remain open |
 | 7 | Moderation and safety | Reports, queues, actions, appeals, escalation, audit records | Not implemented; policy and staffing decisions remain open |
@@ -93,11 +93,11 @@ reason rather than silently omitting it.
 | `DELETE /api/v1/communities/{slug}/leave` | Authenticated member leaves; repeated leave from an active open community is idempotent; owner must transfer ownership first | Anonymous, unknown/private non-member, expired community, owner denial, repeated/concurrent leave, transaction consistency |
 | `POST /api/v1/communities/{slug}/invites` | Owner creates a single-use invite for an invite-only community; raw token is returned once and expires within seven days | Anonymous/non-owner, open/expired community, duplicate requests, hash-only persistence, expiry boundary, throttling |
 | `GET /api/v1/communities/{slug}/invites` | Owner reads paginated invite metadata and lifecycle status; never returns invite tokens | Anonymous/non-owner, unknown slug, pagination boundaries, active/accepted/revoked/expired status |
-| `DELETE /api/v1/communities/{slug}/invites/{invite_public_id}` | Owner revokes an unused invite by public identifier; repeated revoke is idempotent | Anonymous/non-owner, cross-community invite ID, unknown invite, accepted invite conflict, concurrent acceptance/revoke |
+| `DELETE /api/v1/communities/{slug}/invites/{invite_public_id}` | Owner revokes an unused invite by public identifier; revoker and timestamp are retained; repeated revoke is idempotent | Anonymous/non-owner, cross-community invite ID, unknown invite, accepted invite conflict, concurrent acceptance/revoke, revoker field |
 | `POST /api/v1/communities/invites/accept` | Verified signed-in user accepts a token; same-user retries are idempotent | Anonymous/unverified, invalid/expired/revoked, replay by another user, concurrent acceptance, existing membership, throttling |
 | `GET /api/v1/communities/mine` | Authenticated user lists owned communities, including invite-only/expired entries; responses use public identifiers only | Anonymous, pagination bounds/order, no cross-owner rows or internal IDs |
 | `GET /api/v1/communities/{slug}/manage` | Community owner reads their community, including invite-only or expired records; non-owner gets 403 and unknown slug gets 404 | Anonymous, unknown slug, cross-owner status/message, owner/private-field response allowlist |
-| `PATCH /api/v1/communities/{slug}` | Owner updates name, topic, description, access type, or expiry; slug remains stable; non-owner gets 403 and unknown slug gets 404 | Anonymous, non-owner/member status/message, blank/null/oversized fields, empty patch, extra fields, invalid expiry, explicit expiry clear, concurrent writes |
+| `PATCH /api/v1/communities/{slug}` | Owner updates name, topic, description, access type, or expiry; slug remains stable; actual changed field names and actor are audited; non-owner gets 403 and unknown slug gets 404 | Anonymous, non-owner/member/moderator status/message, blank/null/oversized fields, empty patch, extra fields, invalid expiry, explicit expiry clear, concurrent writes, no-op audit behavior |
 | `GET /api/v1/communities/memberships/me` | Authenticated caller lists their own current membership records, including owned communities; returns public community data and role | Anonymous, bounded pagination, ordering, expired-community status, no arbitrary user lookup or internal ID leakage |
 | `GET /api/v1/communities/{slug}/members` | Community owner or moderator lists the current roster; returns user public IDs, display names, roles, and join times only | Anonymous/member/unrelated owner denial, unknown slug, private/expired owner access, cross-community isolation, pagination, no email/internal ID leakage |
 | `PUT /api/v1/communities/{slug}/members/{user_public_id}/role` | Owner sets an existing member to `moderator` or `member`; actual changes are transactionally audited and retries are idempotent | Anonymous/non-owner, owner-target conflict, unknown/cross-community target, invalid/extra fields, concurrent writes, exactly one event for a concurrent repeated change, audit response/DB allowlist |
@@ -327,3 +327,22 @@ is a client of the API; it never connects directly to PostgreSQL.
 - Full suite: **106 passed, 0 skipped** on isolated PostgreSQL 18. Upgrade,
   Alembic drift, downgrade to `0010`, re-upgrade, and a second drift check
   passed. Ruff lint and formatting checks passed.
+
+## 13. Community administrative audit and moderator boundary (October 22, 2026)
+
+- The current moderator permission boundary is roster-read-only. Moderators
+  cannot update metadata, assign roles, manage invites, transfer ownership, or
+  archive/restore communities. Moderation/enforcement writes are deferred to
+  Phase 7.
+- Actual owner metadata changes write the changed field names, actor, and
+  community public ID to `community_metadata_changes`; submitted text values
+  are not copied into audit records. Same-value patches create no event.
+- Invite rows retain creator, acceptor, and revoker IDs/timestamps. Manual
+  revocation and archive-triggered revocation record the actor; repeat revoke
+  does not replace attribution.
+- Alembic `0012_community_admin_audit` adds the metadata audit table and
+  nullable invite revoker reference. Downgrade discards metadata audit history
+  and revoker attribution. Generated PostgreSQL SQL was reviewed.
+- Full suite remains **106 passed, 0 skipped** on isolated PostgreSQL 18.
+  Upgrade, drift check, downgrade to `0011`, re-upgrade, and a second drift
+  check passed. Ruff lint and formatting checks passed.

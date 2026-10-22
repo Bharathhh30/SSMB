@@ -11,6 +11,7 @@ from app.features.communities.models import (
     CommunityInvite,
     CommunityLifecycleEvent,
     CommunityMembership,
+    CommunityMetadataChange,
     CommunityOwnershipChange,
     CommunityRoleChange,
 )
@@ -25,6 +26,7 @@ __all__ = [
     "Community",
     "CommunityInvite",
     "CommunityLifecycleEvent",
+    "CommunityMetadataChange",
     "CommunityMembership",
     "CommunityOwnershipChange",
     "CommunityRoleChange",

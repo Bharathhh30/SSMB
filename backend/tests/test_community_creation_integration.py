@@ -13,7 +13,11 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core.config import Settings
 from app.features.auth.dependencies import require_authenticated_principal
-from app.features.communities.models import Community, CommunityMembership
+from app.features.communities.models import (
+    Community,
+    CommunityMembership,
+    CommunityMetadataChange,
+)
 from app.features.users.models import User
 from app.main import create_app
 
@@ -30,6 +34,7 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
     async def run() -> None:
         owner_id = uuid4()
         joiner_id = uuid4()
+        user_public_ids = {owner_id: uuid4(), joiner_id: uuid4()}
         created_public_ids: list[UUID] = []
         expired_community_id = uuid4()
         expired_membership_id = uuid4()
@@ -41,8 +46,15 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
             async with session_factory() as session:
                 session.add_all(
                     [
-                        User(id=owner_id, display_name="Community creator"),
-                        User(id=joiner_id, display_name="Community joiner"),
+                        User(
+                            id=user_id,
+                            public_id=public_id,
+                            display_name=display_name,
+                        )
+                        for user_id, public_id, display_name in (
+                            (owner_id, user_public_ids[owner_id], "Community creator"),
+                            (joiner_id, user_public_ids[joiner_id], "Community joiner"),
+                        )
                     ]
                 )
                 await session.flush()
@@ -74,7 +86,10 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
             app = create_app(settings)
             active_user_id = {"value": owner_id}
             app.dependency_overrides[require_authenticated_principal] = lambda: SimpleNamespace(
-                user=SimpleNamespace(id=active_user_id["value"])
+                user=SimpleNamespace(
+                    id=active_user_id["value"],
+                    public_id=user_public_ids[active_user_id["value"]],
+                )
             )
 
             async with app.router.lifespan_context(app):
@@ -181,6 +196,15 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
                     )
                     active_user_id["value"] = owner_id
                     owner_edit = await client.patch(
+                        f"/api/v1/communities/{first_slug}",
+                        json={
+                            "name": f"Renamed Circle {suffix[:8]}",
+                            "topic": "Updated biology",
+                            "description": "Updated description",
+                            "expires_at": None,
+                        },
+                    )
+                    owner_edit_noop = await client.patch(
                         f"/api/v1/communities/{first_slug}",
                         json={
                             "name": f"Renamed Circle {suffix[:8]}",
@@ -306,6 +330,7 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
             assert owner_edit.json()["description"] == "Updated description"
             assert owner_edit.json()["expires_at"] is None
             assert owner_edit.json()["slug"] == first_data["slug"]
+            assert owner_edit_noop.status_code == 200
 
             async with session_factory() as session:
                 created_communities = await session.scalars(
@@ -327,6 +352,20 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
                 assert sum(row.user_id == owner_id for row in rows) == 3
                 assert sum(row.user_id == joiner_id for row in rows) == 1
                 assert sum(row.role == "owner" for row in rows) == 3
+                changes_result = await session.scalars(
+                    select(CommunityMetadataChange).where(
+                        CommunityMetadataChange.community_public_id == first_public_id
+                    )
+                )
+                changes = list(changes_result.all())
+                assert len(changes) == 1
+                assert changes[0].actor_public_id == user_public_ids[owner_id]
+                assert changes[0].changed_fields == [
+                    "description",
+                    "expires_at",
+                    "name",
+                    "topic",
+                ]
 
             with pytest.raises(IntegrityError):
                 async with session_factory() as session:
@@ -357,6 +396,11 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
                     delete(Community).where(
                         Community.public_id.in_(created_public_ids)
                         | (Community.id == expired_community_id)
+                    )
+                )
+                await session.execute(
+                    delete(CommunityMetadataChange).where(
+                        CommunityMetadataChange.actor_public_id == user_public_ids[owner_id]
                     )
                 )
                 await session.execute(delete(User).where(User.id.in_([owner_id, joiner_id])))
