@@ -125,6 +125,9 @@ jobs:
       - name: Run mobile unit tests
         run: npm run test:unit
 
+      - name: Test temporary audit exception policy
+        run: npm run test:audit-policy
+
       - name: Generate Expo Router types and export web app
         run: npx expo export --platform web
 
@@ -135,4 +138,4 @@ jobs:
         run: npx expo export --platform ios --platform android
 
       - name: Audit npm dependencies
-        run: npm audit --audit-level=high
+        run: npm run audit:ci

@@ -1,0 +1,19 @@
+{
+  "approved_by": "Project owner",
+  "approved_on": "2026-10-22",
+  "expires_on": "2026-11-05",
+  "exceptions": [
+    {
+      "advisory": "GHSA-vfj7-8cjw-p6xm",
+      "package": "braces",
+      "severity": "high",
+      "reason": "Transitive Expo SDK 57 Metro dependency; npm reports no fix. A forced audit fix downgrades Expo to 44."
+    },
+    {
+      "advisory": "GHSA-86w9-cpqp-85rv",
+      "package": "node-forge",
+      "severity": "high",
+      "reason": "Transitive Expo SDK 57 signing-tool dependency; npm reports no fix. A forced audit fix downgrades Expo to 44."
+    }
+  ]
+}

@@ -326,6 +326,7 @@ Must be resolved in the indicated phase; absence of a choice must not block plan
 | Community access requests | Not selected for the current open/invite-only API scope. Decide whether to add request/review flows, expiry, notifications, and abuse controls before expanding access types. | 3 |
 | Permanent community deletion | No hard-delete API in Phase 3. Define who may request deletion, how dependent content/invites/audit records are handled, and recovery/retention behavior before implementing deletion. | 10 |
 | Role audit retention/anonymization | Decide retention period, access, and account/community deletion behavior for audit events and public-ID snapshots before deletion flows or production launch. | 2/10 |
+| Temporary mobile audit exception | Owner-approved allowlist limited to GHSA-vfj7-8cjw-p6xm (`braces`) and GHSA-86w9-cpqp-85rv (`node-forge`), only while npm reports no compatible fix; expires November 5, 2026. CI must fail on any other high/critical advisory, any newly available fix, or after expiry. | Review by expiry |
 | Cloud provider, region, deployment target, budget | Compare managed container hosting, managed PostgreSQL, storage, backups, data residency, and egress cost after prototype signoff | 10 |
 | ORM and DB access | Validate SQLAlchemy async/sync approach, pooling, transaction boundaries, and migration tooling | 0 |
 | Email, push, object storage | Pick providers and define adapters, deliverability, costs, residency, and failure policy | 0/4/5 |

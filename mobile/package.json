@@ -36,7 +36,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run",
+    "test:audit-policy": "node --test scripts/audit-with-allowlist.test.cjs",
+    "audit:ci": "node scripts/audit-with-allowlist.cjs"
   },
   "private": true
 }
