@@ -98,6 +98,7 @@ reason rather than silently omitting it.
 | `GET /api/v1/communities/mine` | Authenticated user lists owned communities, including invite-only/expired entries; responses use public identifiers only | Anonymous, pagination bounds/order, no cross-owner rows or internal IDs |
 | `GET /api/v1/communities/{slug}/manage` | Community owner reads their community, including invite-only or expired records; non-owner gets 403 and unknown slug gets 404 | Anonymous, unknown slug, cross-owner status/message, owner/private-field response allowlist |
 | `PATCH /api/v1/communities/{slug}` | Owner updates name, topic, description, access type, or expiry; slug remains stable; non-owner gets 403 and unknown slug gets 404 | Anonymous, non-owner/member status/message, blank/null/oversized fields, empty patch, extra fields, invalid expiry, explicit expiry clear, concurrent writes |
+| `GET /api/v1/communities/memberships/me` | Authenticated caller lists their own current membership records, including owned communities; returns public community data and role | Anonymous, bounded pagination, ordering, expired-community status, no arbitrary user lookup or internal ID leakage |
 | `GET /api/v1/profile/me` | Authenticated caller's public ID, display name, and private interests | Missing/expired/revoked auth, no internal ID/email/hash leakage, empty interests |
 | `PATCH /api/v1/profile/me` | Update caller's display name; add/remove private interests | Blank/null/unknown/oversized/duplicate values, atomic add/remove behavior, clearing interests |
 

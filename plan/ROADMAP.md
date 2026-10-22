@@ -461,7 +461,9 @@ public UUIDs (old local share links will need to be refreshed); API DTOs return
 public identifiers or slugs and omit internal primary keys. A seeded pre-`0008`
 row confirmed slug rotation uses its separate public UUID while preserving the
 internal row ID. `GET /communities/mine` lets owners retrieve refreshed slugs,
-including for private communities. The full suite passed 101/101 tests with
+including for private communities. `GET /communities/memberships/me` lists only
+the authenticated user's own owner/member/moderator memberships; it does not
+provide arbitrary-user roster lookup. The full suite passed 101/101 tests with
 zero skips against isolated PostgreSQL 18. Migration `0008` was upgraded/
 downgraded/re-upgraded and Alembic found no model drift. Ruff lint and
 formatting checks passed.

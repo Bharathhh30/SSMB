@@ -40,6 +40,20 @@ class CommunityMembershipRead(BaseModel):
     joined_at: datetime
 
 
+class MyCommunityMembershipRead(BaseModel):
+    community: CommunityRead
+    role: Literal["owner", "moderator", "member"]
+    joined_at: datetime
+    community_status: Literal["active", "expired"]
+
+
+class MyCommunityMembershipPage(BaseModel):
+    items: list[MyCommunityMembershipRead]
+    total: int
+    limit: int
+    offset: int
+
+
 class CommunityDetailRead(CommunityRead):
     member_count: int = Field(
         ge=0,

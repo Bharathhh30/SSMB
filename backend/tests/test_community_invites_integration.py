@@ -177,6 +177,10 @@ def test_owner_invites_are_single_use_revocable_expiring_and_rate_limited() -> N
                         headers=headers(first_member_id),
                         json={"invite_token": raw_token},
                     )
+                    member_communities = await client.get(
+                        "/api/v1/communities/memberships/me",
+                        headers=headers(first_member_id),
+                    )
                     same_user_retry = await client.post(
                         "/api/v1/communities/invites/accept",
                         headers=headers(first_member_id),
@@ -333,6 +337,10 @@ def test_owner_invites_are_single_use_revocable_expiring_and_rate_limited() -> N
             assert first_accept.json()["community_slug"] == slug
             assert "community_id" not in first_accept.json()
             assert "id" not in first_accept.json()
+            assert member_communities.status_code == 200
+            assert member_communities.json()["total"] == 1
+            assert member_communities.json()["items"][0]["community"]["slug"] == slug
+            assert member_communities.json()["items"][0]["role"] == "member"
             assert same_user_retry.status_code == 200
             assert replay_by_other_user.status_code == 409
             assert replay_by_other_user.json() == {

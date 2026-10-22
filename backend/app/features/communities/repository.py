@@ -212,6 +212,32 @@ async def get_membership(
     )
 
 
+async def list_user_memberships(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    limit: int,
+    offset: int,
+) -> tuple[list[tuple[CommunityMembership, Community]], int]:
+    filters = [CommunityMembership.user_id == user_id]
+    total = await session.scalar(
+        select(func.count()).select_from(CommunityMembership).where(*filters)
+    )
+    statement = (
+        select(CommunityMembership, Community)
+        .join(Community, Community.id == CommunityMembership.community_id)
+        .where(*filters)
+        .order_by(
+            CommunityMembership.joined_at.desc(),
+            CommunityMembership.id.asc(),
+        )
+        .limit(limit)
+        .offset(offset)
+    )
+    result = await session.execute(statement)
+    return [(row[0], row[1]) for row in result.all()], total or 0
+
+
 async def add_member(
     session: AsyncSession,
     *,

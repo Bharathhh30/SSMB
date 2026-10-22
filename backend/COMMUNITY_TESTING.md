@@ -74,6 +74,10 @@ verified account. Neither request has a JSON body.
 - `GET /api/v1/communities/mine` lists all communities you own, including
   invite-only and expired ones. Use it to retrieve refreshed slugs after
   applying migration `0008`.
+- `GET /api/v1/communities/memberships/me` lists communities the signed-in
+  account currently belongs to, whether as owner, moderator, or member. It
+  returns only the caller's memberships; it does not accept another user's ID.
+  Expired communities are included with `community_status: "expired"`.
 - `GET /api/v1/communities/{slug}/manage` returns a community only to its owner,
   including an invite-only community that is hidden from public preview.
 - `PATCH /api/v1/communities/{slug}` updates only fields supplied in the body.

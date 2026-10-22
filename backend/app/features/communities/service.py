@@ -12,7 +12,9 @@ from app.features.communities.models import Community, CommunityInvite, Communit
 from app.features.communities.schemas import (
     CommunityCreate,
     CommunityInviteRead,
+    CommunityRead,
     CommunityUpdate,
+    MyCommunityMembershipRead,
 )
 
 COMMUNITY_INVITE_LIFETIME = timedelta(days=7)
@@ -96,6 +98,36 @@ async def list_owned_communities(
         limit=limit,
         offset=offset,
     )
+
+
+async def list_own_memberships(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    limit: int,
+    offset: int,
+) -> tuple[list[MyCommunityMembershipRead], int]:
+    memberships, total = await repository.list_user_memberships(
+        session,
+        user_id=user_id,
+        limit=limit,
+        offset=offset,
+    )
+    now = datetime.now(UTC)
+    items = [
+        MyCommunityMembershipRead(
+            community=CommunityRead.model_validate(community),
+            role=membership.role,
+            joined_at=membership.joined_at,
+            community_status=(
+                "expired"
+                if community.expires_at is not None and community.expires_at <= now
+                else "active"
+            ),
+        )
+        for membership, community in memberships
+    ]
+    return items, total
 
 
 async def discoverable_topics(session: AsyncSession) -> list[str]:

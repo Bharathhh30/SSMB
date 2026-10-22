@@ -69,6 +69,8 @@ frontend implementation before backend completion.
   slugs when names change and allow owners to clear an optional expiry.
 - [x] Add a paginated owner-community list so owners can recover current slugs
   for private/expired communities without exposing internal primary keys.
+- [x] Add a self-only paginated membership list covering owner, moderator, and
+  member roles; do not expose arbitrary users' membership graphs.
 - [x] Include the current owner/moderator/member total in the public community
   detail response without exposing member identities.
 - [x] Distinguish authenticated management denial (`403`) from a missing

@@ -142,8 +142,10 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
                     repeated_leave = await client.delete(f"/api/v1/communities/{first_slug}/leave")
                     rejoin = await client.post(f"/api/v1/communities/{first_slug}/join")
                     joined_public_preview = await client.get(f"/api/v1/communities/{first_slug}")
+                    joined_communities = await client.get("/api/v1/communities/memberships/me")
                     expired_join = await client.post(f"/api/v1/communities/expired-{suffix}/join")
                     active_user_id["value"] = owner_id
+                    owner_memberships = await client.get("/api/v1/communities/memberships/me")
                     unknown_owner_view = await client.get(
                         "/api/v1/communities/unknown-community/manage"
                     )
@@ -203,6 +205,16 @@ def test_community_creation_membership_and_owner_controls_are_authorized() -> No
             assert no_owned_communities.status_code == 200
             assert no_owned_communities.json()["items"] == []
             assert no_owned_communities.json()["total"] == 0
+            assert joined_communities.status_code == 200
+            assert joined_communities.json()["total"] == 1
+            assert joined_communities.json()["items"][0]["community"]["slug"] == first_slug
+            assert joined_communities.json()["items"][0]["role"] == "member"
+            assert joined_communities.json()["items"][0]["community_status"] == "active"
+            assert "id" not in joined_communities.json()["items"][0]
+            assert "community_id" not in joined_communities.json()["items"][0]
+            assert owner_memberships.status_code == 200
+            assert owner_memberships.json()["total"] == 3
+            assert all(item["role"] == "owner" for item in owner_memberships.json()["items"])
             assert second_data["access_type"] == "invite_only"
             assert "id" not in first_data
             assert "id" not in second_data

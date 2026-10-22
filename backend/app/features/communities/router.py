@@ -19,6 +19,7 @@ from app.features.communities.schemas import (
     CommunityPage,
     CommunityRead,
     CommunityUpdate,
+    MyCommunityMembershipPage,
 )
 from app.features.communities.service import (
     CommunityForbidden,
@@ -418,6 +419,30 @@ async def get_communities(
         offset=offset,
     )
     return CommunityPage(items=communities, total=total, limit=limit, offset=offset)
+
+
+@router.get(
+    "/memberships/me",
+    response_model=MyCommunityMembershipPage,
+    summary="List communities the authenticated user belongs to",
+    description=(
+        "Returns the current account's memberships, including communities it owns. "
+        "This endpoint cannot be used to inspect another user's memberships."
+    ),
+)
+async def get_my_community_memberships(
+    principal: AuthenticatedDependency,
+    session: DatabaseSession,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> MyCommunityMembershipPage:
+    items, total = await service.list_own_memberships(
+        session,
+        user_id=principal.user.id,
+        limit=limit,
+        offset=offset,
+    )
+    return MyCommunityMembershipPage(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.get(
