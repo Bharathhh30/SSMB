@@ -15,6 +15,7 @@ def test_initial_models_register_user_and_community_tables() -> None:
         "communities",
         "community_invites",
         "community_memberships",
+        "community_ownership_changes",
         "community_role_changes",
         "users",
         "user_interests",
@@ -83,6 +84,22 @@ def test_initial_models_register_user_and_community_tables() -> None:
         {foreign_key.ondelete for foreign_key in constraint.elements} == {"SET NULL"}
         for constraint in role_change_foreign_keys
     )
+    ownership_changes = Base.metadata.tables["community_ownership_changes"]
+    assert ownership_changes.c.community_public_id.nullable is False
+    assert ownership_changes.c.previous_owner_public_id.nullable is False
+    assert ownership_changes.c.new_owner_public_id.nullable is False
+    assert any(
+        isinstance(constraint, CheckConstraint)
+        and constraint.name == "ck_community_ownership_changes_distinct_owners"
+        for constraint in ownership_changes.constraints
+    )
+    owner_membership_index = next(
+        index
+        for index in memberships.indexes
+        if index.name == "uq_community_memberships_single_owner"
+    )
+    assert owner_membership_index.unique is True
+    assert str(owner_membership_index.dialect_options["postgresql"]["where"]) == "role = 'owner'"
     users = Base.metadata.tables["users"]
     assert users.c.public_id.nullable is False
     assert users.c.email.nullable is True
@@ -98,10 +115,10 @@ def test_initial_models_register_user_and_community_tables() -> None:
     )
 
 
-def test_community_role_audit_migration_is_the_single_head() -> None:
+def test_community_ownership_transfer_migration_is_the_single_head() -> None:
     script = ScriptDirectory.from_config(Config("alembic.ini"))
 
-    assert script.get_heads() == ["0009_community_role_audit"]
+    assert script.get_heads() == ["0010_ownership_transfer"]
     assert (
         script.get_revision("0004_private_user_interests").down_revision == "0003_auth_rate_limits"
     )
@@ -121,4 +138,7 @@ def test_community_role_audit_migration_is_the_single_head() -> None:
     )
     assert (
         script.get_revision("0009_community_role_audit").down_revision == "0008_public_resource_ids"
+    )
+    assert (
+        script.get_revision("0010_ownership_transfer").down_revision == "0009_community_role_audit"
     )

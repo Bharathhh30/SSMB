@@ -18,6 +18,8 @@ from app.features.communities.schemas import (
     CommunityMemberRoleRead,
     CommunityMemberRoleUpdate,
     CommunityMembershipRead,
+    CommunityOwnershipTransfer,
+    CommunityOwnershipTransferRead,
     CommunityPage,
     CommunityRead,
     CommunityRosterPage,
@@ -34,7 +36,9 @@ from app.features.communities.service import (
     CommunityNotFound,
     CommunityNotJoinable,
     CommunityOwnerCannotLeave,
+    CommunityOwnerMembershipMissing,
     CommunityOwnerRoleConflict,
+    CommunityOwnershipConflict,
     CommunitySlugConflict,
 )
 
@@ -557,6 +561,64 @@ async def update_community_member_role(
         raise HTTPException(
             status_code=409,
             detail="The community owner role can only be changed through ownership transfer.",
+        ) from None
+
+
+@router.post(
+    "/{slug}/transfer-ownership",
+    response_model=CommunityOwnershipTransferRead,
+    summary="Transfer community ownership to an existing member",
+    description=(
+        "Only the current owner can transfer ownership to a member of the same community. "
+        "The former owner becomes a regular member and the transfer is audited."
+    ),
+    responses={
+        403: {"description": "The authenticated user is not the current community owner."},
+        404: {"description": "The community or target member does not exist."},
+        409: {"description": "The transfer target or current owner membership is invalid."},
+    },
+)
+async def transfer_community_ownership(
+    data: CommunityOwnershipTransfer,
+    principal: AuthenticatedDependency,
+    session: DatabaseSession,
+    slug: Annotated[
+        str,
+        Path(min_length=1, max_length=140, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$"),
+    ],
+) -> CommunityOwnershipTransferRead:
+    try:
+        return await service.transfer_community_ownership(
+            session,
+            slug=slug,
+            current_owner_id=principal.user.id,
+            current_owner_public_id=principal.user.public_id,
+            new_owner_public_id=data.new_owner_public_id,
+        )
+    except CommunityNotFound:
+        raise HTTPException(status_code=404, detail="Community not found") from None
+    except CommunityForbidden:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not authorized to manage this community.",
+        ) from None
+    except CommunityMemberNotFound:
+        raise HTTPException(
+            status_code=404,
+            detail="The new owner must already be a member of this community.",
+        ) from None
+    except CommunityOwnershipConflict:
+        raise HTTPException(
+            status_code=409,
+            detail="Select a different member as the new community owner.",
+        ) from None
+    except CommunityOwnerMembershipMissing:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Ownership cannot be transferred because the current owner membership "
+                "is inconsistent."
+            ),
         ) from None
 
 

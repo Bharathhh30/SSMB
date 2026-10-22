@@ -1,7 +1,7 @@
 # Backend-first execution and API verification plan
 
 **Status:** Active
-**Last updated:** 2026-10-21
+**Last updated:** 2026-10-22
 **Authority:** This document operationalizes the cumulative scope in `ROADMAP.md`.
 
 ## 1. Sequencing decision
@@ -30,7 +30,7 @@ voice, and engagement remain included.
 | 0 | Product decisions | Resolve only decisions needed before each affected API; define endpoint and permission contracts | Open; keep unresolved decisions explicit |
 | 1 | Engineering foundation | FastAPI, PostgreSQL, Alembic, local test database, health/readiness, API conventions, stable errors/logging | Foundation exists; endpoint edge coverage and repeatable DB test setup need work |
 | 2 | Identity and profile | Registration/sign-in, verification/recovery, sessions, profile, preferences, account controls | Auth and private self-profile endpoints implemented/tested; privacy, block, deletion/export APIs remain |
-| 3 | Communities and discovery | Create/read/update/archive, join/leave/requests, invites, memberships, roles, ownership, access rules | Discovery, create/manage, join/leave, single-use invites, owner/self-membership lists, owner/moderator roster reads, and audited owner-only moderator assignment/removal are PostgreSQL-tested; archive and ownership transfer remain |
+| 3 | Communities and discovery | Create/read/update/archive, join/leave/requests, invites, memberships, roles, ownership, access rules | Discovery, create/manage, join/leave, single-use invites, owner/self-membership lists, owner/moderator roster reads, audited moderator assignment/removal, and audited ownership transfer are PostgreSQL-tested; archive semantics remain |
 | 4 | Content and files | Posts, links, saved items, file metadata, upload/download authorization and storage adapter | Not implemented; storage and retention decisions remain open |
 | 5 | Messaging and notifications | Conversations, messages, read cursors, notification inbox/outbox, delivery adapters | Not implemented; realtime and push decisions remain open |
 | 6 | Scheduling and reservations | Events, RSVP, resource availability/reservation, reminder scheduling | Not implemented; reservation semantics remain open |
@@ -101,6 +101,7 @@ reason rather than silently omitting it.
 | `GET /api/v1/communities/memberships/me` | Authenticated caller lists their own current membership records, including owned communities; returns public community data and role | Anonymous, bounded pagination, ordering, expired-community status, no arbitrary user lookup or internal ID leakage |
 | `GET /api/v1/communities/{slug}/members` | Community owner or moderator lists the current roster; returns user public IDs, display names, roles, and join times only | Anonymous/member/unrelated owner denial, unknown slug, private/expired owner access, cross-community isolation, pagination, no email/internal ID leakage |
 | `PUT /api/v1/communities/{slug}/members/{user_public_id}/role` | Owner sets an existing member to `moderator` or `member`; actual changes are transactionally audited and retries are idempotent | Anonymous/non-owner, owner-target conflict, unknown/cross-community target, invalid/extra fields, concurrent writes, exactly one event for a concurrent repeated change, audit response/DB allowlist |
+| `POST /api/v1/communities/{slug}/transfer-ownership` | Current owner transfers to an existing community member; target becomes owner and former owner becomes member; mutation is atomic and audited | Anonymous/non-owner, self/non-member/cross-community target, malformed/extra fields, concurrent transfer, exactly one owner membership, post-transfer owner/leave permissions, audit response/DB allowlist |
 | `GET /api/v1/profile/me` | Authenticated caller's public ID, display name, and private interests | Missing/expired/revoked auth, no internal ID/email/hash leakage, empty interests |
 | `PATCH /api/v1/profile/me` | Update caller's display name; add/remove private interests | Blank/null/unknown/oversized/duplicate values, atomic add/remove behavior, clearing interests |
 
@@ -280,3 +281,28 @@ is a client of the API; it never connects directly to PostgreSQL.
 - The migration's generated PostgreSQL SQL was reviewed. Upgrade, downgrade
   to `0008`, re-upgrade, and Alembic drift checks passed on isolated
   PostgreSQL 18. Full suite: **104 passed, 0 skipped**.
+
+## 11. Community ownership transfer (October 22, 2026)
+
+- Only the current owner can transfer ownership, and the target must already
+  be a member of the same community. The new owner receives the `owner` role;
+  the former owner becomes a regular member. A moderator target does not keep
+  moderator status after becoming owner.
+- The community owner ID and both membership roles change in one transaction
+  after locking the community and affected memberships. A PostgreSQL partial
+  unique index prevents more than one owner membership per community. The
+  former owner may leave afterward; the new owner cannot leave until another
+  transfer.
+- `POST /api/v1/communities/{slug}/transfer-ownership` accepts
+  `{"new_owner_public_id": "<existing member public UUID>"}`. The target lookup
+  is scoped to that community. Non-member/cross-community targets return
+  `404`; non-owners receive `403`; self-transfer and inconsistent owner state
+  return `409`.
+- Alembic `0010_ownership_transfer` creates `community_ownership_changes` and
+  the single-owner index. Generated PostgreSQL SQL was reviewed; the migration
+  refuses to apply if it finds duplicate owner memberships. Downgrade removes
+  ownership history and the index. Audit snapshots still need
+  retention/anonymization rules before production account/community deletion.
+- The full suite passed **105 tests, 0 skipped** on isolated PostgreSQL 18.
+  Upgrade, drift check, downgrade to `0009`, re-upgrade, and a second drift
+  check passed. Ruff lint and formatting checks passed.

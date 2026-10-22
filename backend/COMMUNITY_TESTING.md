@@ -71,8 +71,8 @@ verified account. Neither request has a JSON body.
 
 ## Read and update your community
 
-Before testing moderator role changes against your local database, apply the
-new audit-table migration from the `backend` directory:
+Before testing moderator or ownership changes against your local database,
+apply the community migrations from the `backend` directory:
 
 ```powershell
 uv run --locked alembic upgrade head
@@ -120,6 +120,28 @@ uv run --locked alembic upgrade head
   downgrade drops that history. Public-ID snapshots are retained if an
   associated account or community is deleted, so audit retention and
   anonymization must be decided before production account/community deletion.
+- As the current owner, transfer ownership to a current member with
+  `POST /api/v1/communities/{slug}/transfer-ownership`:
+
+```json
+{
+  "new_owner_public_id": "paste-the-member-user_public_id-from-the-roster"
+}
+```
+
+  The target must already be a member of this same community. On success, the
+  new owner receives the `owner` role and the former owner becomes a regular
+  `member`; the community owner and both membership roles change atomically.
+  The response contains the community public ID, previous/new owner public
+  IDs, and transfer timestamp. The transfer is stored in the internal
+  `community_ownership_changes` audit table. Unknown/non-member/cross-community
+  targets return `404`, non-owners receive `403`, and selecting the current
+  owner returns `409`. The former owner can leave afterward; the new owner
+  cannot leave until ownership is transferred again.
+- Alembic `0010_ownership_transfer` also enforces at most one owner membership
+  per community. Its downgrade removes that constraint and ownership history;
+  it should not be used as a production rollback without accounting for lost
+  audit records.
 - `GET /api/v1/communities/{slug}/manage` returns a community only to its owner,
   including an invite-only community that is hidden from public preview.
 - `PATCH /api/v1/communities/{slug}` updates only fields supplied in the body.

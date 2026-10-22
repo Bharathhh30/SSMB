@@ -89,6 +89,12 @@ class CommunityMembership(Base):
             name="uq_community_memberships_community_user",
         ),
         Index("ix_community_memberships_user_id", "user_id"),
+        Index(
+            "uq_community_memberships_single_owner",
+            "community_id",
+            unique=True,
+            postgresql_where=text("role = 'owner'"),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
@@ -155,6 +161,46 @@ class CommunityRoleChange(Base):
     previous_role: Mapped[str] = mapped_column(String(20), nullable=False)
     new_role: Mapped[str] = mapped_column(String(20), nullable=False)
     changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
+class CommunityOwnershipChange(Base):
+    __tablename__ = "community_ownership_changes"
+    __table_args__ = (
+        CheckConstraint(
+            "previous_owner_public_id <> new_owner_public_id",
+            name="ck_community_ownership_changes_distinct_owners",
+        ),
+        Index(
+            "ix_community_ownership_changes_community_transferred_at",
+            "community_public_id",
+            "transferred_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    community_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("communities.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    community_public_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    previous_owner_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    previous_owner_public_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    new_owner_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    new_owner_public_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    transferred_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),

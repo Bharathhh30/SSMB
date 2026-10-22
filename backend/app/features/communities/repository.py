@@ -8,6 +8,7 @@ from app.features.communities.models import (
     Community,
     CommunityInvite,
     CommunityMembership,
+    CommunityOwnershipChange,
     CommunityRoleChange,
 )
 from app.features.users.models import User
@@ -209,13 +210,15 @@ async def get_membership(
     *,
     community_id: UUID,
     user_id: UUID,
+    for_update: bool = False,
 ) -> CommunityMembership | None:
-    return await session.scalar(
-        select(CommunityMembership).where(
-            CommunityMembership.community_id == community_id,
-            CommunityMembership.user_id == user_id,
-        )
+    statement = select(CommunityMembership).where(
+        CommunityMembership.community_id == community_id,
+        CommunityMembership.user_id == user_id,
     )
+    if for_update:
+        statement = statement.with_for_update()
+    return await session.scalar(statement)
 
 
 async def list_user_memberships(
@@ -336,6 +339,32 @@ async def add_community_role_change(
     session.add(role_change)
     await session.flush()
     return role_change
+
+
+async def add_community_ownership_change(
+    session: AsyncSession,
+    *,
+    community_id: UUID,
+    community_public_id: UUID,
+    previous_owner_user_id: UUID,
+    previous_owner_public_id: UUID,
+    new_owner_user_id: UUID,
+    new_owner_public_id: UUID,
+    transferred_at: datetime,
+) -> CommunityOwnershipChange:
+    ownership_change = CommunityOwnershipChange(
+        id=uuid4(),
+        community_id=community_id,
+        community_public_id=community_public_id,
+        previous_owner_user_id=previous_owner_user_id,
+        previous_owner_public_id=previous_owner_public_id,
+        new_owner_user_id=new_owner_user_id,
+        new_owner_public_id=new_owner_public_id,
+        transferred_at=transferred_at,
+    )
+    session.add(ownership_change)
+    await session.flush()
+    return ownership_change
 
 
 async def add_member(

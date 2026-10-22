@@ -81,6 +81,19 @@ class CommunityMemberRoleRead(BaseModel):
     changed: bool
 
 
+class CommunityOwnershipTransfer(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    new_owner_public_id: UUID
+
+
+class CommunityOwnershipTransferRead(BaseModel):
+    community_public_id: UUID
+    previous_owner_public_id: UUID
+    new_owner_public_id: UUID
+    transferred_at: datetime
+
+
 class CommunityDetailRead(CommunityRead):
     member_count: int = Field(
         ge=0,

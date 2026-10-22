@@ -10,6 +10,7 @@ from app.features.communities.models import (
     Community,
     CommunityInvite,
     CommunityMembership,
+    CommunityOwnershipChange,
     CommunityRoleChange,
 )
 from app.features.profiles.models import UserInterest
@@ -23,6 +24,7 @@ __all__ = [
     "Community",
     "CommunityInvite",
     "CommunityMembership",
+    "CommunityOwnershipChange",
     "CommunityRoleChange",
     "User",
     "UserInterest",

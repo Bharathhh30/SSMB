@@ -321,6 +321,7 @@ Must be resolved in the indicated phase; absence of a choice must not block plan
 | Public resource identifiers | **Approved:** API responses and public slugs must not expose database primary keys; use independent public UUIDs and immutable public slugs after migration. | 3 |
 | Community roster privacy | **Approved (October 22, 2026):** only a community owner or moderator can view that community's member identities; public previews expose aggregate counts only; arbitrary users' cross-community membership histories remain private. | 3 |
 | Moderator role management | **Approved (October 22, 2026):** owners alone can promote existing members to moderators or demote moderators to members; the owner role uses a separate transfer operation; changes are transactionally audited and same-role retries are no-ops. | 3 |
+| Ownership transfer | **Implemented contract (October 22, 2026):** current owner can transfer only to an existing member; target becomes the sole owner, former owner becomes a regular member, and the change is atomic and audited. | 3 |
 | Role audit retention/anonymization | Decide retention period, access, and account/community deletion behavior for audit events and public-ID snapshots before deletion flows or production launch. | 2/10 |
 | Cloud provider, region, deployment target, budget | Compare managed container hosting, managed PostgreSQL, storage, backups, data residency, and egress cost after prototype signoff | 10 |
 | ORM and DB access | Validate SQLAlchemy async/sync approach, pooling, transaction boundaries, and migration tooling | 0 |
@@ -446,9 +447,9 @@ rejects other-account reuse, respects community expiry, and is rate-limited.
 The shareable app URL will be constructed by the client, not tied to a backend
 domain. The full suite passed 101/101 tests with zero skips against isolated
 PostgreSQL 18; the new migration was reviewed, downgraded/re-upgraded, and
-Alembic reported no drift. Archive behavior, moderator controls, ownership
-transfer, and remaining access/privacy contracts remain. No mobile files were
-changed.
+Alembic reported no drift. At this invite checkpoint, archive behavior,
+moderator controls, and ownership transfer remained; subsequent checkpoints
+below record the later role and transfer work. No mobile files were changed.
 
 After the owner reported duplicate community names, creation now rejects
 case/whitespace-equivalent names with `409 Conflict`. Alembic revision
@@ -479,3 +480,12 @@ upgrade/downgrade/re-upgrade verified. The full suite passed 104/104 tests
 with zero skips against isolated PostgreSQL 18. Ruff lint and formatting
 checks passed. Audit snapshot retention/anonymization remains a production and
 account-deletion decision.
+
+The current Phase 3 ownership-transfer API lets the current owner transfer to
+an existing member. The target becomes the sole owner and the former owner
+becomes a regular member. Alembic `0010_ownership_transfer` adds a partial
+unique owner-membership index and a separate transfer audit table. Migration
+and role/ownership endpoints passed **105/105 tests with zero skips** on
+isolated PostgreSQL 18; upgrade/downgrade/re-upgrade and drift checks passed.
+Archive semantics and audit retention/anonymization remain open; no mobile
+files were changed.

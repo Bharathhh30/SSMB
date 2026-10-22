@@ -14,6 +14,7 @@ from app.features.communities.schemas import (
     CommunityCreate,
     CommunityInviteRead,
     CommunityMemberRoleRead,
+    CommunityOwnershipTransferRead,
     CommunityRead,
     CommunityRosterMemberRead,
     CommunityUpdate,
@@ -67,6 +68,14 @@ class CommunityMemberNotFound(Exception):
 
 class CommunityOwnerRoleConflict(Exception):
     """The owner role can only be changed through ownership transfer."""
+
+
+class CommunityOwnershipConflict(Exception):
+    """The requested ownership transfer is not valid in the current state."""
+
+
+class CommunityOwnerMembershipMissing(Exception):
+    """The owner has no matching owner membership record."""
 
 
 async def get_public_community_with_member_count(
@@ -236,6 +245,73 @@ async def set_community_member_role(
         previous_role=previous_role,
         role=role,
         changed=True,
+    )
+
+
+async def transfer_community_ownership(
+    session: AsyncSession,
+    *,
+    slug: str,
+    current_owner_id: UUID,
+    current_owner_public_id: UUID,
+    new_owner_public_id: UUID,
+) -> CommunityOwnershipTransferRead:
+    community = await _get_locked_owned_community(
+        session,
+        slug=slug,
+        owner_id=current_owner_id,
+    )
+    target = await repository.get_community_member_by_public_id(
+        session,
+        community_id=community.id,
+        user_public_id=new_owner_public_id,
+        for_update=True,
+    )
+    if target is None:
+        await session.rollback()
+        raise CommunityMemberNotFound
+
+    target_membership, new_owner = target
+    if (
+        new_owner.id == current_owner_id
+        or target_membership.role == "owner"
+        or new_owner_public_id == current_owner_public_id
+    ):
+        await session.rollback()
+        raise CommunityOwnershipConflict
+
+    current_owner_membership = await repository.get_membership(
+        session,
+        community_id=community.id,
+        user_id=current_owner_id,
+        for_update=True,
+    )
+    if current_owner_membership is None or current_owner_membership.role != "owner":
+        await session.rollback()
+        raise CommunityOwnerMembershipMissing
+
+    transferred_at = datetime.now(UTC)
+    current_owner_membership.role = "member"
+    await session.flush()
+
+    target_membership.role = "owner"
+    community.owner_id = new_owner.id
+    await repository.add_community_ownership_change(
+        session,
+        community_id=community.id,
+        community_public_id=community.public_id,
+        previous_owner_user_id=current_owner_id,
+        previous_owner_public_id=current_owner_public_id,
+        new_owner_user_id=new_owner.id,
+        new_owner_public_id=new_owner.public_id,
+        transferred_at=transferred_at,
+    )
+    await session.commit()
+    return CommunityOwnershipTransferRead(
+        community_public_id=community.public_id,
+        previous_owner_public_id=current_owner_public_id,
+        new_owner_public_id=new_owner.public_id,
+        transferred_at=transferred_at,
     )
 
 
